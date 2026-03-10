@@ -34,6 +34,9 @@ export class Holiday {
   @Column({ type: 'boolean', default: false })
   isOptional!: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  isSpecial!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 }

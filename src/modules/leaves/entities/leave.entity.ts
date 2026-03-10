@@ -65,6 +65,12 @@ export class Leave {
   @Column({ type: 'text', nullable: true })
   reason!: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  isHalfDay!: boolean;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  halfDayType!: string | null;
+
   @Column({
     type: 'enum',
     enum: LeaveStatus,

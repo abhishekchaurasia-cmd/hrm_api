@@ -1,7 +1,8 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -43,6 +44,70 @@ export class AttendanceController {
   @ApiResponse({ status: 200, description: 'Today attendance retrieved' })
   getMyToday(@CurrentUser() user: AuthUser) {
     return this.attendanceService.getMyTodayAttendance(user);
+  }
+
+  @Get('api/v1/attendance/me/history')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get attendance history for current user' })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    description: 'Month (1-12), defaults to current month',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    description: 'Year, defaults to current year',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number, defaults to 1',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page, defaults to 31',
+  })
+  @ApiResponse({ status: 200, description: 'Attendance history retrieved' })
+  getMyHistory(
+    @CurrentUser() user: AuthUser,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ) {
+    const now = new Date();
+    const m = month ? parseInt(month, 10) : now.getMonth() + 1;
+    const y = year ? parseInt(year, 10) : now.getFullYear();
+    const p = page ? parseInt(page, 10) : 1;
+    const l = limit ? parseInt(limit, 10) : 31;
+    return this.attendanceService.getMyAttendanceHistory(user, m, y, p, l);
+  }
+
+  @Get('api/v1/attendance/me/summary')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get monthly attendance summary for current user' })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    description: 'Month (1-12), defaults to current month',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    description: 'Year, defaults to current year',
+  })
+  @ApiResponse({ status: 200, description: 'Attendance summary retrieved' })
+  getMySummary(
+    @CurrentUser() user: AuthUser,
+    @Query('month') month?: string,
+    @Query('year') year?: string
+  ) {
+    const now = new Date();
+    const m = month ? parseInt(month, 10) : now.getMonth() + 1;
+    const y = year ? parseInt(year, 10) : now.getFullYear();
+    return this.attendanceService.getMyAttendanceSummary(user, m, y);
   }
 
   @Get('api/v1/hr/attendance/today')

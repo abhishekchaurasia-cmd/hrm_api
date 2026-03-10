@@ -28,4 +28,12 @@ export class CreateHolidayDto {
   @IsBoolean()
   @IsOptional()
   isOptional?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Is special/restricted holiday',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isSpecial?: boolean;
 }

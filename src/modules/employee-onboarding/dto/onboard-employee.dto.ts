@@ -114,6 +114,12 @@ class JobDetailsDto {
   @MaxLength(255)
   jobTitle?: string;
 
+  @ApiPropertyOptional({ example: 'Frontend Engineer' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  secondaryJobTitle?: string;
+
   @ApiPropertyOptional({ enum: TimeType })
   @IsEnum(TimeType)
   @IsOptional()

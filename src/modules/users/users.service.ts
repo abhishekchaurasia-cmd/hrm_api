@@ -60,6 +60,38 @@ export class UsersService {
     };
   }
 
+  async findOptions(): Promise<
+    ApiResponse<
+      Array<{
+        id: string;
+        userId: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        role: UserRole;
+      }>
+    >
+  > {
+    const users = await this.userRepository.find({
+      where: { isActive: true },
+      select: ['id', 'firstName', 'lastName', 'email', 'role'],
+      order: { firstName: 'ASC', lastName: 'ASC' },
+    });
+
+    return {
+      success: true,
+      message: 'User options retrieved',
+      data: users.map(u => ({
+        id: u.id,
+        userId: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        role: u.role,
+      })),
+    };
+  }
+
   async findOne(id: string): Promise<ApiResponse<UserResponse>> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
