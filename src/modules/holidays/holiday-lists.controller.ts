@@ -117,8 +117,8 @@ export class HolidayListsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Deactivate holiday list (HR only)' })
-  @ApiResponse({ status: 200, description: 'Holiday list deactivated' })
+  @ApiOperation({ summary: 'Delete holiday list (HR only)' })
+  @ApiResponse({ status: 200, description: 'Holiday list deleted' })
   removeList(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeList(id);
   }

@@ -4,10 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Brackets, Repository } from 'typeorm';
+import { Between, Brackets, MoreThanOrEqual, Repository } from 'typeorm';
 
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
 import { EmployeeProfile } from '../users/entities/employee-profile.entity.js';
+import { User } from '../users/entities/user.entity.js';
 import type { BulkCreateHolidaysDto } from './dto/bulk-create-holidays.dto.js';
 import { CreateHolidayDto } from './dto/create-holiday.dto.js';
 import { CreateHolidayListDto } from './dto/create-holiday-list.dto.js';
@@ -27,6 +28,8 @@ export class HolidayListsService {
     private readonly holidayRepo: Repository<Holiday>,
     @InjectRepository(EmployeeProfile)
     private readonly profileRepo: Repository<EmployeeProfile>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly publicHolidaysService: PublicHolidaysService
   ) {}
 
@@ -47,7 +50,7 @@ export class HolidayListsService {
   async findAllLists(
     year?: number
   ): Promise<ApiResponse<Record<string, unknown>[]>> {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { isActive: true };
     if (year) {
       where.year = year;
     }
@@ -106,7 +109,7 @@ export class HolidayListsService {
 
   async findOneList(id: string): Promise<ApiResponse<HolidayList>> {
     const item = await this.listRepo.findOne({
-      where: { id },
+      where: { id, isActive: true },
       relations: ['holidays'],
     });
     if (!item) {
@@ -147,9 +150,16 @@ export class HolidayListsService {
     if (!item) {
       throw new NotFoundException(`Holiday list with ID "${id}" not found`);
     }
-    item.isActive = false;
-    await this.listRepo.save(item);
-    return { success: true, message: 'Holiday list deactivated', data: null };
+
+    await this.profileRepo
+      .createQueryBuilder()
+      .update(EmployeeProfile)
+      .set({ holidayListId: () => 'NULL' })
+      .where('holidayListId = :id', { id })
+      .execute();
+
+    await this.listRepo.remove(item);
+    return { success: true, message: 'Holiday list deleted', data: null };
   }
 
   async addHoliday(
@@ -268,7 +278,14 @@ export class HolidayListsService {
       ).map(h => h.date)
     );
 
-    const toInsert = holidaysToImport.filter(h => !existingDates.has(h.date));
+    const uniqueByDate = new Map<string, (typeof holidaysToImport)[number]>();
+    for (const h of holidaysToImport) {
+      if (!existingDates.has(h.date) && !uniqueByDate.has(h.date)) {
+        uniqueByDate.set(h.date, h);
+      }
+    }
+
+    const toInsert = Array.from(uniqueByDate.values());
     const skipped = holidaysToImport.length - toInsert.length;
 
     const entities = toInsert.map(h =>
@@ -364,23 +381,86 @@ export class HolidayListsService {
     listId: string,
     employeeIds: string[]
   ): Promise<ApiResponse<{ assigned: number }>> {
-    const list = await this.listRepo.findOne({ where: { id: listId } });
+    const list = await this.listRepo.findOne({
+      where: { id: listId, isActive: true },
+    });
     if (!list) {
-      throw new NotFoundException(`Holiday list with ID "${listId}" not found`);
+      throw new NotFoundException(
+        `Holiday list with ID "${listId}" not found or inactive`
+      );
     }
 
-    const result = await this.profileRepo
+    const existingProfiles = await this.profileRepo
+      .createQueryBuilder('ep')
+      .select('ep.userId')
+      .where('ep.userId IN (:...employeeIds)', { employeeIds })
+      .getMany();
+
+    const usersWithProfiles = new Set(existingProfiles.map(p => p.userId));
+    const usersWithoutProfiles = employeeIds.filter(
+      id => !usersWithProfiles.has(id)
+    );
+
+    if (usersWithoutProfiles.length > 0) {
+      const users = await this.userRepo
+        .createQueryBuilder('u')
+        .where('u.id IN (:...ids)', { ids: usersWithoutProfiles })
+        .andWhere('u.isActive = :active', { active: true })
+        .getMany();
+
+      if (users.length > 0) {
+        const nextSeq = await this.getNextEmployeeSeq('EMP');
+        const newProfiles = users.map((u, i) => {
+          const num = `EMP-${String(nextSeq + i).padStart(3, '0')}`;
+          return this.profileRepo.create({
+            userId: u.id,
+            employeeNumber: num,
+            displayName: `${u.firstName} ${u.lastName}`.trim() || null,
+            holidayListId: listId,
+          });
+        });
+        await this.profileRepo.save(newProfiles);
+      }
+    }
+
+    const updateResult = await this.profileRepo
       .createQueryBuilder()
       .update(EmployeeProfile)
       .set({ holidayListId: listId })
       .where('userId IN (:...employeeIds)', { employeeIds })
       .execute();
 
+    const totalAssigned = updateResult.affected ?? 0;
+
+    if (totalAssigned === 0) {
+      throw new BadRequestException(
+        'No valid employees found for the provided IDs'
+      );
+    }
+
     return {
       success: true,
-      message: `${result.affected ?? 0} employees assigned to holiday plan`,
-      data: { assigned: result.affected ?? 0 },
+      message: `${totalAssigned} employees assigned to holiday plan`,
+      data: { assigned: totalAssigned },
     };
+  }
+
+  private async getNextEmployeeSeq(prefix: string): Promise<number> {
+    const profiles = await this.profileRepo
+      .createQueryBuilder('p')
+      .where('p.employeeNumber LIKE :prefix', { prefix: `${prefix}-%` })
+      .orderBy('p.employeeNumber', 'DESC')
+      .limit(1)
+      .getMany();
+
+    if (profiles.length > 0) {
+      const parts = profiles[0].employeeNumber.split('-');
+      const numPart = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(numPart)) {
+        return numPart + 1;
+      }
+    }
+    return 1;
   }
 
   async unassignEmployees(
@@ -395,7 +475,7 @@ export class HolidayListsService {
     const result = await this.profileRepo
       .createQueryBuilder()
       .update(EmployeeProfile)
-      .set({ holidayListId: null as unknown as string })
+      .set({ holidayListId: () => 'NULL' })
       .where('userId IN (:...employeeIds)', { employeeIds })
       .andWhere('holidayListId = :listId', { listId })
       .execute();
@@ -416,13 +496,15 @@ export class HolidayListsService {
       throw new NotFoundException(`Holiday list with ID "${listId}" not found`);
     }
 
-    const qb = this.profileRepo
-      .createQueryBuilder('ep')
-      .leftJoinAndSelect('ep.user', 'user')
-      .where(
+    const qb = this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.profile', 'ep')
+      .where('user.isActive = :active', { active: true })
+      .andWhere(
         new Brackets(sub => {
           sub
-            .where('ep.holidayListId IS NULL')
+            .where('ep.id IS NULL')
+            .orWhere('ep.holidayListId IS NULL')
             .orWhere('ep.holidayListId != :listId', { listId });
         })
       );
@@ -443,20 +525,18 @@ export class HolidayListsService {
 
     qb.orderBy('user.firstName', 'ASC').addOrderBy('user.lastName', 'ASC');
 
-    const profiles = await qb.getMany();
+    const users = await qb.getMany();
 
-    const data = profiles.map(p => ({
-      id: p.id,
-      userId: p.userId,
-      employeeNumber: p.employeeNumber,
-      displayName: p.displayName,
-      user: p.user
-        ? {
-            email: p.user.email,
-            firstName: p.user.firstName,
-            lastName: p.user.lastName,
-          }
-        : null,
+    const data = users.map(u => ({
+      id: u.profile?.id ?? null,
+      userId: u.id,
+      employeeNumber: u.profile?.employeeNumber ?? null,
+      displayName: u.profile?.displayName ?? null,
+      user: {
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+      },
     }));
 
     return {
@@ -518,6 +598,121 @@ export class HolidayListsService {
       success: true,
       message: 'Holidays retrieved',
       data,
+    };
+  }
+
+  async getEmployeeHolidayPlan(
+    userId: string
+  ): Promise<ApiResponse<Record<string, unknown> | null>> {
+    const profile = await this.profileRepo.findOne({
+      where: { userId },
+      select: ['holidayListId'],
+    });
+
+    if (!profile?.holidayListId) {
+      return { success: true, message: 'No holiday plan assigned', data: null };
+    }
+
+    const list = await this.listRepo.findOne({
+      where: { id: profile.holidayListId, isActive: true },
+    });
+
+    if (!list) {
+      return { success: true, message: 'No holiday plan assigned', data: null };
+    }
+
+    const holidayCount = await this.holidayRepo.count({
+      where: { holidayListId: list.id },
+    });
+
+    return {
+      success: true,
+      message: 'Holiday plan retrieved',
+      data: {
+        id: list.id,
+        name: list.name,
+        year: list.year,
+        description: list.description,
+        holidayCount,
+      },
+    };
+  }
+
+  async getUpcomingHolidays(
+    userId: string,
+    limit = 5
+  ): Promise<ApiResponse<Record<string, unknown>[]>> {
+    const profile = await this.profileRepo.findOne({
+      where: { userId },
+      select: ['holidayListId'],
+    });
+
+    let holidayListId: string | null = profile?.holidayListId ?? null;
+
+    if (!holidayListId) {
+      const currentYear = new Date().getFullYear();
+      const activeList = await this.listRepo.findOne({
+        where: { year: currentYear, isActive: true, isDefault: true },
+      });
+      holidayListId = activeList?.id ?? null;
+    }
+
+    if (!holidayListId) {
+      return { success: true, message: 'No upcoming holidays', data: [] };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const holidays = await this.holidayRepo.find({
+      where: {
+        holidayListId,
+        date: MoreThanOrEqual(today),
+      },
+      order: { date: 'ASC' },
+      take: limit,
+    });
+
+    const data = holidays.map(h => ({
+      id: h.id,
+      name: h.name,
+      date: h.date,
+      isOptional: h.isOptional,
+      isSpecial: h.isSpecial,
+    }));
+
+    return { success: true, message: 'Upcoming holidays retrieved', data };
+  }
+
+  async getEmployeeHolidayCalendar(
+    userId: string,
+    year: number
+  ): Promise<ApiResponse<Record<string, unknown>>> {
+    const result = await this.getEmployeeHolidays(userId, year);
+    const holidays = result.data as Array<{
+      id: string;
+      name: string;
+      date: string;
+      isOptional: boolean;
+      isSpecial: boolean;
+    }>;
+
+    const calendar: Record<string, typeof holidays> = {};
+    for (const h of holidays) {
+      const month = h.date.substring(0, 7);
+      if (!calendar[month]) {
+        calendar[month] = [];
+      }
+      calendar[month].push(h);
+    }
+
+    return {
+      success: true,
+      message: 'Holiday calendar retrieved',
+      data: {
+        year,
+        totalHolidays: holidays.length,
+        months: calendar,
+      },
     };
   }
 }
