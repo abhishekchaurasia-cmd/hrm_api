@@ -15,6 +15,7 @@ import {
   LeaveTransaction,
   LeaveTransactionType,
 } from '../leave-policies/entities/leave-transaction.entity.js';
+import { HolidayList } from '../holidays/entities/holiday-list.entity.js';
 import { ShiftAssignment } from '../shifts/entities/shift-assignment.entity.js';
 import { Shift } from '../shifts/entities/shift.entity.js';
 import { EmployeeProfile } from '../users/entities/employee-profile.entity.js';
@@ -26,6 +27,7 @@ export interface OnboardingResult {
   profile: { id: string; employeeNumber: string };
   shiftAssignment?: { id: string; shiftId: string };
   leavePlanAssignment?: { id: string; leavePlanId: string };
+  holidayListAssignment?: { id: string; holidayListId: string; name: string };
   compensation?: { id: string; annualSalary: number };
 }
 
@@ -128,6 +130,23 @@ export class EmployeeOnboardingService {
           employeeNumber: savedProfile.employeeNumber,
         },
       };
+
+      // Step 2b: Validate Holiday List assignment
+      if (moreDetails?.holidayListId) {
+        const holidayList = await queryRunner.manager.findOne(HolidayList, {
+          where: { id: moreDetails.holidayListId, isActive: true },
+        });
+        if (!holidayList) {
+          throw new BadRequestException(
+            `Holiday list with ID "${moreDetails.holidayListId}" not found or inactive`
+          );
+        }
+        result.holidayListAssignment = {
+          id: savedProfile.id,
+          holidayListId: holidayList.id,
+          name: holidayList.name,
+        };
+      }
 
       // Step 3: Assign Shift
       if (moreDetails?.shiftId) {

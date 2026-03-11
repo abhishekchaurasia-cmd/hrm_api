@@ -34,6 +34,9 @@ All endpoints require HR authentication (`Authorization: Bearer <jwt>`) and `hr`
    - [Unassign Employees from Plan](#unassign-employees-from-plan)
 7. [Employee View (Self-Service)](#employee-view-self-service)
    - [Get My Holidays](#get-my-holidays)
+   - [Get My Holiday Plan](#get-my-holiday-plan)
+   - [Get Upcoming Holidays](#get-upcoming-holidays)
+   - [Get Holiday Calendar](#get-holiday-calendar)
 8. [Frontend Routing](#frontend-routing)
 9. [Component Hierarchy](#component-hierarchy)
 10. [Page Layout & Wireframes](#page-layout--wireframes)
@@ -354,7 +357,7 @@ All fields are optional. If `isDefault` is set to `true`, the backend unsets any
 
 ### Delete Holiday Plan
 
-Deactivates a holiday plan (soft delete). Employees previously assigned to this plan will fall back to the default active plan for their year.
+Permanently deletes a holiday plan. All holidays in the plan are cascade-deleted. All employees assigned to this plan are automatically unassigned (`holidayListId` set to `null`).
 
 | Method | Endpoint                    | Auth    |
 | ------ | --------------------------- | ------- |
@@ -365,23 +368,27 @@ Deactivates a holiday plan (soft delete). Employees previously assigned to this 
 ```json
 {
   "success": true,
-  "message": "Holiday list deactivated",
+  "message": "Holiday list deleted",
   "data": null
 }
 ```
 
-**Confirmation Dialog:**
+**Important:** This is a permanent delete, not a soft delete. Show a strong confirmation dialog.
 
-Before calling this endpoint, show a confirmation modal:
+**Confirmation Dialog:**
 
 ```
 ┌─────────────────────────────────────────────────┐
 │  Delete Holiday Plan                             │
 │                                                  │
-│  Are you sure you want to delete "PB-IN"?        │
+│  Are you sure you want to permanently delete     │
+│  "PB-IN"?                                        │
 │                                                  │
-│  This plan has 62 employees assigned to it.      │
-│  They will fall back to the default plan.        │
+│  - All holidays in this plan will be removed     │
+│  - 62 employees will be unassigned from this     │
+│    plan and will need to be reassigned           │
+│                                                  │
+│  This action cannot be undone.                   │
 │                                                  │
 │                      [Cancel]  [Delete]          │
 └─────────────────────────────────────────────────┘
@@ -632,7 +639,16 @@ Adds multiple holidays to a plan at once. Useful when manually entering a full y
 
 ## Import Holidays from Country
 
-This feature allows HR to import public holidays from the **Nager.Date API** -- a free, open-source public holiday database covering 120+ countries. HR selects a country, previews the holidays, picks the ones to import, and they are added to the plan.
+This feature allows HR to import public holidays from the **Nager.Date API** (120+ countries) and **built-in static data** (India and other countries not covered by Nager.Date). HR selects a country, previews the holidays, picks the ones to import, and they are added to the plan.
+
+**Country Sources:**
+
+| Source               | Countries      | Notes                                                 |
+| -------------------- | -------------- | ----------------------------------------------------- |
+| Built-in static data | India (`IN`)   | Includes all gazetted holidays with Hindi local names |
+| Nager.Date API v3    | 120+ countries | Cached for 1 hour, graceful fallback on failure       |
+
+The country dropdown merges both sources alphabetically. India appears as a standard entry.
 
 ### Import Flow
 
@@ -689,7 +705,9 @@ Returns the list of countries supported by the public holidays API.
 }
 ```
 
-**Frontend:** Render as a searchable dropdown/select. Cache this list in the frontend since it rarely changes.
+India (`IN`) is always present in the list -- it comes from built-in static data, not the external API. The list is sorted alphabetically.
+
+**Frontend:** Render as a searchable dropdown/select. The backend caches this for 1 hour, so the frontend can also cache safely.
 
 ---
 
@@ -719,11 +737,11 @@ GET /api/v1/holiday-lists/public-holidays/IN/2026
 ```json
 {
   "success": true,
-  "message": "Public holidays for India 2026 retrieved",
+  "message": "Public holidays for IN 2026 retrieved",
   "data": [
     {
       "name": "Republic Day",
-      "localName": "Republic Day",
+      "localName": "गणतन्त्र दिवस",
       "date": "2026-01-26",
       "isOptional": false,
       "isSpecial": false,
@@ -731,8 +749,35 @@ GET /api/v1/holiday-lists/public-holidays/IN/2026
       "isGlobal": true
     },
     {
+      "name": "Maha Shivaratri",
+      "localName": "महा शिवरात्रि",
+      "date": "2026-02-26",
+      "isOptional": false,
+      "isSpecial": false,
+      "types": ["Public"],
+      "isGlobal": true
+    },
+    {
+      "name": "Holi",
+      "localName": "होली",
+      "date": "2026-03-14",
+      "isOptional": false,
+      "isSpecial": false,
+      "types": ["Public"],
+      "isGlobal": true
+    },
+    {
+      "name": "Dr. Ambedkar Jayanti",
+      "localName": "डॉ. अम्बेडकर जयन्ती",
+      "date": "2026-04-14",
+      "isOptional": false,
+      "isSpecial": false,
+      "types": ["Public"],
+      "isGlobal": true
+    },
+    {
       "name": "Independence Day",
-      "localName": "Independence Day",
+      "localName": "स्वतन्त्रता दिवस",
       "date": "2026-08-15",
       "isOptional": false,
       "isSpecial": false,
@@ -741,7 +786,7 @@ GET /api/v1/holiday-lists/public-holidays/IN/2026
     },
     {
       "name": "Mahatma Gandhi Jayanti",
-      "localName": "Mahatma Gandhi Jayanti",
+      "localName": "महात्मा गांधी जयन्ती",
       "date": "2026-10-02",
       "isOptional": false,
       "isSpecial": false,
@@ -749,8 +794,17 @@ GET /api/v1/holiday-lists/public-holidays/IN/2026
       "isGlobal": true
     },
     {
-      "name": "Christmas Day",
-      "localName": "Christmas Day",
+      "name": "Diwali",
+      "localName": "दीपावली",
+      "date": "2026-10-20",
+      "isOptional": false,
+      "isSpecial": false,
+      "types": ["Public"],
+      "isGlobal": true
+    },
+    {
+      "name": "Christmas",
+      "localName": "क्रिसमस",
       "date": "2026-12-25",
       "isOptional": false,
       "isSpecial": false,
@@ -760,6 +814,8 @@ GET /api/v1/holiday-lists/public-holidays/IN/2026
   ]
 }
 ```
+
+India holidays come from built-in static data (19 gazetted holidays). The `localName` field contains the Hindi name. Only a subset is shown above -- the full list includes Holi, Good Friday, Eid, Ram Navami, Mahavir Jayanti, Buddha Purnima, Bakrid, Muharram, Milad-un-Nabi, Dussehra, Guru Nanak Jayanti, and more.
 
 **Type Mapping from Nager.Date:**
 
@@ -1012,7 +1068,7 @@ GET /api/v1/holiday-lists/uuid-1/employees/unassigned?search=john
 
 ### Assign Employees to Plan
 
-Bulk assigns employees to a holiday plan. Sets `holidayListId` on each employee profile.
+Bulk assigns employees to a holiday plan. Sets `holidayListId` on each employee profile. The plan must be active.
 
 | Method | Endpoint                                         | Auth    |
 | ------ | ------------------------------------------------ | ------- |
@@ -1041,6 +1097,13 @@ Bulk assigns employees to a holiday plan. Sets `holidayListId` on each employee 
   }
 }
 ```
+
+**Errors:**
+
+| Status | Condition                     | Response                                           |
+| ------ | ----------------------------- | -------------------------------------------------- |
+| 404    | Plan not found or inactive    | `Holiday list with ID "..." not found or inactive` |
+| 400    | No matching employee profiles | `No employee profiles found for the provided IDs`  |
 
 ---
 
@@ -1152,6 +1215,31 @@ Employee assignment can also be done via:
 - **Profile Update**: `PATCH /api/v1/employee-profiles/:userId` with `{ "holidayListId": "uuid" }`
 - **Onboarding**: Set `holidayListId` in `moreDetails` during employee onboarding
 
+#### Holiday Plan Dropdown in Onboarding
+
+When building the onboarding form (Step 3 / More Details), populate the holiday plan dropdown by calling:
+
+| Method | Endpoint                | Auth    |
+| ------ | ----------------------- | ------- |
+| GET    | `/api/v1/holiday-lists` | HR only |
+
+**Query Parameters:**
+
+| Param  | Type   | Required | Description                        |
+| ------ | ------ | -------- | ---------------------------------- |
+| `year` | number | No       | Filter by year (e.g. current year) |
+
+Use the `id` field from each returned item as the value and `name` as the label for the dropdown. This is the same endpoint used on the Holiday Plan Management page. Pass the selected `id` as `moreDetails.holidayListId` in the onboarding payload.
+
+**Example fetch for the dropdown:**
+
+```typescript
+const response = await api.get('/api/v1/holiday-lists', {
+  params: { year: new Date().getFullYear() },
+});
+// response.data.data → [{ id, name, year, ... }]
+```
+
 ---
 
 ## Employee View (Self-Service)
@@ -1262,12 +1350,262 @@ GET /api/v1/holidays?year=2026
 
 ---
 
+### Get My Holiday Plan
+
+Returns the current employee's assigned holiday plan details (name, year, holiday count). Returns `null` if no plan is assigned.
+
+| Method | Endpoint                | Auth                   |
+| ------ | ----------------------- | ---------------------- |
+| GET    | `/api/v1/holidays/plan` | Any authenticated user |
+
+**Response (plan assigned):**
+
+```json
+{
+  "success": true,
+  "message": "Holiday plan retrieved",
+  "data": {
+    "id": "uuid-1",
+    "name": "PB-IN",
+    "year": 2026,
+    "description": "India public holidays",
+    "holidayCount": 19
+  }
+}
+```
+
+**Response (no plan):**
+
+```json
+{
+  "success": true,
+  "message": "No holiday plan assigned",
+  "data": null
+}
+```
+
+**Frontend:** Display this in a card on the employee dashboard or holidays page header. Show plan name, year, and holiday count. If `data` is `null`, show a message like "No holiday plan assigned -- contact HR."
+
+---
+
+### Get Upcoming Holidays
+
+Returns the next N upcoming holidays from today for the current employee. Useful for dashboard widgets.
+
+| Method | Endpoint                    | Auth                   |
+| ------ | --------------------------- | ---------------------- |
+| GET    | `/api/v1/holidays/upcoming` | Any authenticated user |
+
+**Query Parameters:**
+
+| Param   | Type   | Required | Default | Description                           |
+| ------- | ------ | -------- | ------- | ------------------------------------- |
+| `limit` | number | No       | 5       | Number of upcoming holidays to return |
+
+**Request:**
+
+```
+GET /api/v1/holidays/upcoming?limit=3
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Upcoming holidays retrieved",
+  "data": [
+    {
+      "id": "uuid-1",
+      "name": "Holi",
+      "date": "2026-03-14",
+      "isOptional": false,
+      "isSpecial": false
+    },
+    {
+      "id": "uuid-2",
+      "name": "Good Friday",
+      "date": "2026-03-29",
+      "isOptional": false,
+      "isSpecial": false
+    },
+    {
+      "id": "uuid-3",
+      "name": "Dr. Ambedkar Jayanti",
+      "date": "2026-04-14",
+      "isOptional": false,
+      "isSpecial": false
+    }
+  ]
+}
+```
+
+**Frontend:** Render as a compact list in the employee dashboard widget:
+
+```
+┌─────────────────────────────────────────────┐
+│  Upcoming Holidays                           │
+│                                              │
+│  14 Mar 2026    Holi                         │
+│  29 Mar 2026    Good Friday                  │
+│  14 Apr 2026    Dr. Ambedkar Jayanti         │
+│                                              │
+│  View All Holidays →                         │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+### Get Holiday Calendar
+
+Returns holidays for the current employee grouped by month for calendar view rendering.
+
+| Method | Endpoint                    | Auth                   |
+| ------ | --------------------------- | ---------------------- |
+| GET    | `/api/v1/holidays/calendar` | Any authenticated user |
+
+**Query Parameters:**
+
+| Param  | Type   | Required | Default      | Description                |
+| ------ | ------ | -------- | ------------ | -------------------------- |
+| `year` | number | No       | Current year | Year to fetch holidays for |
+
+**Request:**
+
+```
+GET /api/v1/holidays/calendar?year=2026
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Holiday calendar retrieved",
+  "data": {
+    "year": 2026,
+    "totalHolidays": 19,
+    "months": {
+      "2026-01": [
+        {
+          "id": "uuid-1",
+          "name": "Republic Day",
+          "date": "2026-01-26",
+          "isOptional": false,
+          "isSpecial": false
+        }
+      ],
+      "2026-02": [
+        {
+          "id": "uuid-2",
+          "name": "Maha Shivaratri",
+          "date": "2026-02-26",
+          "isOptional": false,
+          "isSpecial": false
+        }
+      ],
+      "2026-03": [
+        {
+          "id": "uuid-3",
+          "name": "Holi",
+          "date": "2026-03-14",
+          "isOptional": false,
+          "isSpecial": false
+        },
+        {
+          "id": "uuid-4",
+          "name": "Good Friday",
+          "date": "2026-03-29",
+          "isOptional": false,
+          "isSpecial": false
+        },
+        {
+          "id": "uuid-5",
+          "name": "Id-ul-Fitr (Eid)",
+          "date": "2026-03-31",
+          "isOptional": false,
+          "isSpecial": false
+        }
+      ],
+      "2026-08": [
+        {
+          "id": "uuid-6",
+          "name": "Independence Day",
+          "date": "2026-08-15",
+          "isOptional": false,
+          "isSpecial": false
+        }
+      ],
+      "2026-10": [
+        {
+          "id": "uuid-7",
+          "name": "Mahatma Gandhi Jayanti",
+          "date": "2026-10-02",
+          "isOptional": false,
+          "isSpecial": false
+        },
+        {
+          "id": "uuid-8",
+          "name": "Diwali",
+          "date": "2026-10-20",
+          "isOptional": false,
+          "isSpecial": false
+        }
+      ],
+      "2026-12": [
+        {
+          "id": "uuid-9",
+          "name": "Christmas",
+          "date": "2026-12-25",
+          "isOptional": false,
+          "isSpecial": false
+        }
+      ]
+    }
+  }
+}
+```
+
+**Frontend:** Use this to render a month-by-month calendar or timeline view. The `months` object uses `YYYY-MM` keys. Only months with holidays are included.
+
+**Calendar Page Wireframe:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Holiday Calendar 2026                    PB-IN (19 days)   │
+│                                                              │
+│  ┌─ January ─────────────────────────────────────────────┐  │
+│  │  26 Jan    Republic Day                                │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌─ February ────────────────────────────────────────────┐  │
+│  │  26 Feb    Maha Shivaratri                             │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌─ March ───────────────────────────────────────────────┐  │
+│  │  14 Mar    Holi                                        │  │
+│  │  29 Mar    Good Friday                                 │  │
+│  │  31 Mar    Id-ul-Fitr (Eid)                            │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌─ August ──────────────────────────────────────────────┐  │
+│  │  15 Aug    Independence Day                            │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ...                                                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Frontend Routing
 
 ```
 /settings/holidays                    → Holiday Plan Management page (HR)
 /settings/holidays/:listId            → Deep-link to a specific plan (HR)
-/dashboard                            → Employee dashboard (includes holiday widget)
+/dashboard                            → Employee dashboard (includes upcoming holidays widget)
+/my/holidays                          → Employee holiday list (full year view)
+/my/holidays/calendar                 → Employee holiday calendar (month-by-month)
 ```
 
 ---
@@ -1378,12 +1716,33 @@ HolidayManagementPage
 ```
 HolidayWidget
 ├── WidgetHeader ("Upcoming Holidays")
-├── HolidayList
+├── PlanInfo (useMyHolidayPlan → plan name, holiday count)
+├── HolidayList (useUpcomingHolidays)
 │   └── HolidayItem (for each upcoming holiday)
 │       ├── HolidayDate (formatted)
 │       ├── HolidayName
 │       └── OptionalBadge (if isOptional)
-└── ViewAllLink → Full holidays page or modal
+└── ViewAllLink → /my/holidays
+```
+
+### Employee Holiday Calendar Page
+
+```
+HolidayCalendarPage
+├── PageHeader
+│   ├── Title ("Holiday Calendar 2026")
+│   ├── PlanName (from useMyHolidayPlan)
+│   ├── TotalCount ("19 days")
+│   └── YearSelector (dropdown or tabs)
+├── MonthSections (from useHolidayCalendar)
+│   └── MonthSection (for each month with holidays)
+│       ├── MonthHeader ("January", "February", etc.)
+│       └── HolidayList
+│           └── HolidayRow
+│               ├── Date (formatted)
+│               ├── HolidayName
+│               └── OptionalBadge / SpecialBadge
+└── EmptyState (if no holidays)
 ```
 
 ---
@@ -1527,6 +1886,53 @@ export function useMyHolidays(year: number) {
 
   return {
     holidays: data?.data ?? [],
+    isLoading,
+    isError: !!error,
+  };
+}
+```
+
+```typescript
+// hooks/useMyHolidayPlan.ts (Employee self-service)
+export function useMyHolidayPlan() {
+  const { data, error, isLoading } = useSWR('/api/v1/holidays/plan', fetcher);
+
+  return {
+    plan: data?.data ?? null,
+    isLoading,
+    isError: !!error,
+  };
+}
+```
+
+```typescript
+// hooks/useUpcomingHolidays.ts (Employee self-service)
+export function useUpcomingHolidays(limit = 5) {
+  const { data, error, isLoading } = useSWR(
+    `/api/v1/holidays/upcoming?limit=${limit}`,
+    fetcher
+  );
+
+  return {
+    holidays: data?.data ?? [],
+    isLoading,
+    isError: !!error,
+  };
+}
+```
+
+```typescript
+// hooks/useHolidayCalendar.ts (Employee self-service)
+export function useHolidayCalendar(year: number) {
+  const { data, error, isLoading } = useSWR(
+    `/api/v1/holidays/calendar?year=${year}`,
+    fetcher
+  );
+
+  return {
+    calendar: data?.data ?? null,
+    totalHolidays: data?.data?.totalHolidays ?? 0,
+    months: data?.data?.months ?? {},
     isLoading,
     isError: !!error,
   };
@@ -1817,7 +2223,8 @@ try {
 | `GET /public-holidays/IN/2026` | 502 API unavailable  | Show "Service temporarily unavailable, try again"   |
 | `POST /.../holidays/import`    | 404 Plan not found   | Refresh plan list                                   |
 | `POST /.../holidays/import`    | 201 with skipped > 0 | Show toast: "X imported, Y skipped (already exist)" |
-| `POST /.../employees/assign`   | 404 Plan not found   | Refresh plan list                                   |
+| `POST /.../employees/assign`   | 404 Inactive/missing | Show "Plan not found or inactive"                   |
+| `POST /.../employees/assign`   | 400 No profiles      | Show "No employee profiles found for the IDs"       |
 | `POST /.../employees/assign`   | 400 Empty array      | Show "Select at least one employee"                 |
 | `POST /.../employees/unassign` | 404 Plan not found   | Refresh plan list                                   |
 
@@ -1857,27 +2264,30 @@ try {
 
 ## API Summary Table
 
-| Method                       | Endpoint                                                     | Description                                   | Auth |
-| ---------------------------- | ------------------------------------------------------------ | --------------------------------------------- | ---- |
-| **Holiday Plans (HR)**       |                                                              |                                               |      |
-| POST                         | `/api/v1/holiday-lists`                                      | Create holiday plan                           | HR   |
-| GET                          | `/api/v1/holiday-lists?year=`                                | List all plans (with employee/holiday counts) | HR   |
-| GET                          | `/api/v1/holiday-lists/:id`                                  | Get plan with holidays                        | HR   |
-| PATCH                        | `/api/v1/holiday-lists/:id`                                  | Update plan                                   | HR   |
-| DELETE                       | `/api/v1/holiday-lists/:id`                                  | Deactivate plan                               | HR   |
-| **Holidays in Plan (HR)**    |                                                              |                                               |      |
-| POST                         | `/api/v1/holiday-lists/:listId/holidays`                     | Add single holiday                            | HR   |
-| PATCH                        | `/api/v1/holiday-lists/:listId/holidays/:holidayId`          | Update holiday                                | HR   |
-| DELETE                       | `/api/v1/holiday-lists/:listId/holidays/:holidayId`          | Remove holiday                                | HR   |
-| POST                         | `/api/v1/holiday-lists/:listId/holidays/bulk`                | Bulk add holidays                             | HR   |
-| **Import from Country (HR)** |                                                              |                                               |      |
-| GET                          | `/api/v1/holiday-lists/public-holidays/countries`            | Get available countries                       | HR   |
-| GET                          | `/api/v1/holiday-lists/public-holidays/:countryCode/:year`   | Preview public holidays                       | HR   |
-| POST                         | `/api/v1/holiday-lists/:listId/holidays/import`              | Import selected holidays                      | HR   |
-| **Employee Assignment (HR)** |                                                              |                                               |      |
-| GET                          | `/api/v1/holiday-lists/:listId/employees`                    | Get employees in plan                         | HR   |
-| GET                          | `/api/v1/holiday-lists/:listId/employees/unassigned?search=` | Get unassigned employees                      | HR   |
-| POST                         | `/api/v1/holiday-lists/:listId/employees/assign`             | Bulk assign employees                         | HR   |
-| POST                         | `/api/v1/holiday-lists/:listId/employees/unassign`           | Bulk unassign employees                       | HR   |
-| **Employee Self-Service**    |                                                              |                                               |      |
-| GET                          | `/api/v1/holidays?year=`                                     | Get my holidays                               | All  |
+| Method                       | Endpoint                                                     | Description                               | Auth |
+| ---------------------------- | ------------------------------------------------------------ | ----------------------------------------- | ---- |
+| **Holiday Plans (HR)**       |                                                              |                                           |      |
+| POST                         | `/api/v1/holiday-lists`                                      | Create holiday plan                       | HR   |
+| GET                          | `/api/v1/holiday-lists?year=`                                | List all active plans (with counts)       | HR   |
+| GET                          | `/api/v1/holiday-lists/:id`                                  | Get plan with holidays                    | HR   |
+| PATCH                        | `/api/v1/holiday-lists/:id`                                  | Update plan                               | HR   |
+| DELETE                       | `/api/v1/holiday-lists/:id`                                  | Permanently delete plan                   | HR   |
+| **Holidays in Plan (HR)**    |                                                              |                                           |      |
+| POST                         | `/api/v1/holiday-lists/:listId/holidays`                     | Add single holiday                        | HR   |
+| PATCH                        | `/api/v1/holiday-lists/:listId/holidays/:holidayId`          | Update holiday                            | HR   |
+| DELETE                       | `/api/v1/holiday-lists/:listId/holidays/:holidayId`          | Remove holiday                            | HR   |
+| POST                         | `/api/v1/holiday-lists/:listId/holidays/bulk`                | Bulk add holidays                         | HR   |
+| **Import from Country (HR)** |                                                              |                                           |      |
+| GET                          | `/api/v1/holiday-lists/public-holidays/countries`            | Get available countries (incl. India)     | HR   |
+| GET                          | `/api/v1/holiday-lists/public-holidays/:countryCode/:year`   | Preview public holidays                   | HR   |
+| POST                         | `/api/v1/holiday-lists/:listId/holidays/import`              | Import selected holidays                  | HR   |
+| **Employee Assignment (HR)** |                                                              |                                           |      |
+| GET                          | `/api/v1/holiday-lists/:listId/employees`                    | Get employees in plan                     | HR   |
+| GET                          | `/api/v1/holiday-lists/:listId/employees/unassigned?search=` | Get unassigned employees                  | HR   |
+| POST                         | `/api/v1/holiday-lists/:listId/employees/assign`             | Bulk assign employees (active plans only) | HR   |
+| POST                         | `/api/v1/holiday-lists/:listId/employees/unassign`           | Bulk unassign employees                   | HR   |
+| **Employee Self-Service**    |                                                              |                                           |      |
+| GET                          | `/api/v1/holidays?year=`                                     | Get my holidays for a year                | All  |
+| GET                          | `/api/v1/holidays/plan`                                      | Get my assigned holiday plan              | All  |
+| GET                          | `/api/v1/holidays/upcoming?limit=`                           | Get next N upcoming holidays              | All  |
+| GET                          | `/api/v1/holidays/calendar?year=`                            | Get holidays grouped by month             | All  |

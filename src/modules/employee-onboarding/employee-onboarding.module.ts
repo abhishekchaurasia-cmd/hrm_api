@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Compensation } from '../compensation/entities/compensation.entity.js';
 import { SalaryBreakup } from '../compensation/entities/salary-breakup.entity.js';
+import { HolidayList } from '../holidays/entities/holiday-list.entity.js';
 import { LeaveBalance } from '../leave-policies/entities/leave-balance.entity.js';
 import { LeavePlanAssignment } from '../leave-policies/entities/leave-plan-assignment.entity.js';
 import { LeavePlan } from '../leave-policies/entities/leave-plan.entity.js';
@@ -20,6 +21,7 @@ import { EmployeeOnboardingService } from './employee-onboarding.service.js';
     TypeOrmModule.forFeature([
       User,
       EmployeeProfile,
+      HolidayList,
       Shift,
       ShiftAssignment,
       LeavePlan,
