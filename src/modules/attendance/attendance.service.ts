@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
@@ -21,6 +21,19 @@ export interface TodayAttendanceData {
   totalMinutes: number | null;
   status: AttendanceStatus | null;
   shiftId: string | null;
+}
+
+export interface AttendanceSummaryData {
+  month: number;
+  year: number;
+  totalDays: number;
+  present: number;
+  late: number;
+  halfDay: number;
+  absent: number;
+  totalWorkedMinutes: number;
+  expectedMinutesPerDay: number;
+  averageWorkedMinutes: number;
 }
 
 export interface HrTodayEmployeeAttendance {
@@ -281,6 +294,126 @@ export class AttendanceService {
       success: true,
       message: 'Today attendance list retrieved',
       data: { workDate, employees },
+    };
+  }
+
+  async getMyAttendanceHistory(
+    user: AuthUser,
+    month: number,
+    year: number,
+    page: number,
+    limit: number
+  ): Promise<
+    ApiResponse<{
+      records: Attendance[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>
+  > {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const skip = (page - 1) * limit;
+
+    const [records, total] = await this.attendanceRepository.findAndCount({
+      where: {
+        userId: user.id,
+        workDate: Between(startDate, endDate),
+      },
+      relations: ['shift'],
+      order: { workDate: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      success: true,
+      message: 'Attendance history retrieved',
+      data: {
+        records,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getMyAttendanceSummary(
+    user: AuthUser,
+    month: number,
+    year: number
+  ): Promise<ApiResponse<AttendanceSummaryData>> {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const records = await this.attendanceRepository.find({
+      where: {
+        userId: user.id,
+        workDate: Between(startDate, endDate),
+      },
+    });
+
+    let present = 0;
+    let late = 0;
+    let halfDay = 0;
+    let absent = 0;
+    let totalWorkedMinutes = 0;
+
+    for (const record of records) {
+      switch (record.status) {
+        case AttendanceStatus.PRESENT:
+          present++;
+          break;
+        case AttendanceStatus.LATE:
+          late++;
+          break;
+        case AttendanceStatus.HALF_DAY:
+          halfDay++;
+          break;
+        case AttendanceStatus.ABSENT:
+          absent++;
+          break;
+      }
+      if (record.totalMinutes) {
+        totalWorkedMinutes += record.totalMinutes;
+      }
+    }
+
+    const shiftAssignment =
+      await this.shiftAssignmentsService.getActiveShiftForUser(
+        user.id,
+        startDate
+      );
+    const expectedMinutesPerDay = shiftAssignment?.shift
+      ? Number(shiftAssignment.shift.workHoursPerDay) * 60
+      : 9 * 60;
+
+    const recordsWithTime = records.filter(r => r.totalMinutes !== null);
+    const averageWorkedMinutes =
+      recordsWithTime.length > 0
+        ? Math.round(totalWorkedMinutes / recordsWithTime.length)
+        : 0;
+
+    return {
+      success: true,
+      message: 'Attendance summary retrieved',
+      data: {
+        month,
+        year,
+        totalDays: records.length,
+        present,
+        late,
+        halfDay,
+        absent,
+        totalWorkedMinutes,
+        expectedMinutesPerDay,
+        averageWorkedMinutes,
+      },
     };
   }
 }

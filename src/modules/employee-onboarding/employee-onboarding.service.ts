@@ -96,6 +96,7 @@ export class EmployeeOnboardingService {
         mobileNumber: basicDetails.mobileNumber ?? null,
         joiningDate: jobDetails?.joiningDate ?? null,
         jobTitle: jobDetails?.jobTitle ?? null,
+        secondaryJobTitle: jobDetails?.secondaryJobTitle ?? null,
         timeType: jobDetails?.timeType,
         workerType: jobDetails?.workerType ?? null,
         reportingManagerId: jobDetails?.reportingManagerId ?? null,

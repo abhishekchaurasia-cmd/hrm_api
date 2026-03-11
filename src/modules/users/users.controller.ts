@@ -40,6 +40,16 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @Get('options')
+  @Roles(UserRole.HR)
+  @ApiOperation({
+    summary: 'Get lightweight user list for dropdowns (HR only)',
+  })
+  @ApiResponse({ status: 200, description: 'User options retrieved' })
+  findOptions() {
+    return this.usersService.findOptions();
+  }
+
   @Get(':id')
   @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get user by ID (HR only)' })

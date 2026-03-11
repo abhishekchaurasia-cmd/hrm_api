@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -40,4 +42,21 @@ export class CreateLeaveDto {
   @IsString()
   @IsOptional()
   reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether this is a half-day leave',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isHalfDay?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Half-day type (required when isHalfDay is true)',
+    enum: ['first_half', 'second_half'],
+  })
+  @IsString()
+  @IsIn(['first_half', 'second_half'])
+  @IsOptional()
+  halfDayType?: string;
 }

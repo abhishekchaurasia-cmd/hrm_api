@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -31,4 +32,12 @@ export class CreateHolidayListDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Mark as default plan for this year',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
 }

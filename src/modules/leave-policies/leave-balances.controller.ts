@@ -29,12 +29,21 @@ import { LeaveBalancesService } from './leave-balances.service.js';
 @ApiTags('leave-balances')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.HR)
 @Controller('api/v1/leave-balances')
 export class LeaveBalancesController {
   constructor(private readonly balancesService: LeaveBalancesService) {}
 
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user leave balances' })
+  @ApiQuery({ name: 'year', required: false })
+  @ApiResponse({ status: 200, description: 'Leave balances retrieved' })
+  findMyBalances(@CurrentUser() user: AuthUser, @Query('year') year?: string) {
+    const balanceYear = year ? parseInt(year, 10) : new Date().getFullYear();
+    return this.balancesService.findByEmployee(user.id, balanceYear);
+  }
+
   @Post('initialize')
+  @Roles(UserRole.HR)
   @ApiOperation({
     summary:
       'Initialize leave balances for all employees assigned to a plan (HR only)',
@@ -49,6 +58,7 @@ export class LeaveBalancesController {
   }
 
   @Get()
+  @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get all leave balances (HR only)' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'planId', required: false })
@@ -67,6 +77,7 @@ export class LeaveBalancesController {
   }
 
   @Get('employee/:userId')
+  @Roles(UserRole.HR)
   @ApiOperation({ summary: "Get an employee's leave balances (HR only)" })
   @ApiQuery({ name: 'year', required: false })
   @ApiResponse({ status: 200, description: 'Employee balances retrieved' })
@@ -81,6 +92,7 @@ export class LeaveBalancesController {
   }
 
   @Post('adjust')
+  @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Manually adjust a leave balance (HR only)' })
   @ApiResponse({ status: 200, description: 'Balance adjusted' })
   adjust(@Body() dto: AdjustLeaveBalanceDto, @CurrentUser() user: AuthUser) {
@@ -88,6 +100,7 @@ export class LeaveBalancesController {
   }
 
   @Get('transactions')
+  @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get leave transaction audit log (HR only)' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'year', required: false })

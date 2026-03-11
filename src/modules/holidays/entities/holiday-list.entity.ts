@@ -26,6 +26,9 @@ export class HolidayList {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  isDefault!: boolean;
+
   @OneToMany('Holiday', (holiday: Holiday) => holiday.holidayList)
   holidays?: Holiday[];
 
