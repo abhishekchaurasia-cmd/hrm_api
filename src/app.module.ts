@@ -11,6 +11,8 @@ import { CompensationModule } from './modules/compensation/compensation.module.j
 import { DepartmentsModule } from './modules/departments/departments.module.js';
 import { EmployeeOnboardingModule } from './modules/employee-onboarding/employee-onboarding.module.js';
 import { HolidaysModule } from './modules/holidays/holidays.module.js';
+import { PenalizationPoliciesModule } from './modules/penalization-policies/penalization-policies.module.js';
+import { TimeTrackingPoliciesModule } from './modules/time-tracking-policies/time-tracking-policies.module.js';
 import { LeavePoliciesModule } from './modules/leave-policies/leave-policies.module.js';
 import { LeavesModule } from './modules/leaves/leaves.module.js';
 import { OrganizationModule } from './modules/organization/organization.module.js';
@@ -54,6 +56,8 @@ import { SharedModule } from './shared/shared.module.js';
     HolidaysModule,
     CompensationModule,
     EmployeeOnboardingModule,
+    PenalizationPoliciesModule,
+    TimeTrackingPoliciesModule,
   ],
   controllers: [AppController],
   providers: [

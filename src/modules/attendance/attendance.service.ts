@@ -10,6 +10,7 @@ import type { ApiResponse } from '../../common/interfaces/api-response.interface
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import type { Shift } from '../shifts/entities/shift.entity.js';
 import { ShiftAssignmentsService } from '../shifts/shift-assignments.service.js';
+import { TimeTrackingPoliciesService } from '../time-tracking-policies/time-tracking-policies.service.js';
 import { User, UserRole } from '../users/entities/user.entity.js';
 
 import { Attendance, AttendanceStatus } from './entities/attendance.entity.js';
@@ -55,7 +56,8 @@ export class AttendanceService {
     private readonly attendanceRepository: Repository<Attendance>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly shiftAssignmentsService: ShiftAssignmentsService
+    private readonly shiftAssignmentsService: ShiftAssignmentsService,
+    private readonly timeTrackingPoliciesService: TimeTrackingPoliciesService
   ) {}
 
   private getServerNow(): Date {
@@ -149,6 +151,22 @@ export class AttendanceService {
       throw new BadRequestException(
         'You have already completed attendance for today'
       );
+    }
+
+    const activePolicy =
+      await this.timeTrackingPoliciesService.getActivePolicyForUser(user.id);
+    if (activePolicy) {
+      const { captureSettings } = activePolicy;
+      if (
+        !captureSettings.webClockIn.enabled &&
+        !captureSettings.mobileClockIn.enabled &&
+        !captureSettings.remoteClockIn.enabled &&
+        !captureSettings.biometricEnabled
+      ) {
+        throw new BadRequestException(
+          'No attendance capture method is enabled for your policy'
+        );
+      }
     }
 
     const shiftAssignment =
