@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -20,6 +21,7 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { AssignPenalizationPolicyDto } from './dto/assign-penalization-policy.dto.js';
 import { PenalizationAssignmentsService } from './penalization-assignments.service.js';
 
@@ -46,8 +48,11 @@ export class PenalizationAssignmentsController {
   @Get(':id/assignments')
   @ApiOperation({ summary: 'Get policy assignments (HR only)' })
   @ApiResponse({ status: 200, description: 'Assignments retrieved' })
-  findByPolicy(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assignmentsService.findByPolicy(id);
+  findByPolicy(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() pagination: PaginationQueryDto
+  ) {
+    return this.assignmentsService.findByPolicy(id, pagination);
   }
 
   @Delete(':id/assignments/:assignmentId')

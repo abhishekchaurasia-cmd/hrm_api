@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -22,6 +23,7 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateShiftDto } from './dto/create-shift.dto.js';
 import { SetWeeklyOffsDto } from './dto/set-weekly-offs.dto.js';
 import { UpdateShiftDto } from './dto/update-shift.dto.js';
@@ -45,8 +47,8 @@ export class ShiftsController {
   @Get()
   @ApiOperation({ summary: 'List all active shifts (HR only)' })
   @ApiResponse({ status: 200, description: 'Shifts retrieved' })
-  findAll() {
-    return this.shiftsService.findAll();
+  findAll(@Query() pagination: PaginationQueryDto) {
+    return this.shiftsService.findAll(pagination);
   }
 
   @Get(':id')

@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 
 import type { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto.js';
@@ -130,10 +133,12 @@ export class LeaveBalancesService {
   }
 
   async findAll(
+    pagination: PaginationQueryDto,
     userId?: string,
     planId?: string,
     year?: number
-  ): Promise<ApiResponse<LeaveBalance[]>> {
+  ): Promise<ApiResponse<PaginatedResult<LeaveBalance>>> {
+    const { page, limit } = pagination;
     const qb = this.balanceRepository
       .createQueryBuilder('balance')
       .leftJoinAndSelect('balance.leaveTypeConfig', 'config')
@@ -150,14 +155,17 @@ export class LeaveBalancesService {
       qb.andWhere('balance.year = :year', { year });
     }
 
-    qb.orderBy('user.firstName', 'ASC').addOrderBy('config.name', 'ASC');
+    qb.orderBy('user.firstName', 'ASC')
+      .addOrderBy('config.name', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-    const balances = await qb.getMany();
+    const [items, total] = await qb.getManyAndCount();
 
     return {
       success: true,
       message: 'Leave balances retrieved',
-      data: balances,
+      data: paginate(items, total, page, limit),
     };
   }
 
@@ -236,9 +244,11 @@ export class LeaveBalancesService {
   }
 
   async getTransactions(
+    pagination: PaginationQueryDto,
     userId?: string,
     year?: number
-  ): Promise<ApiResponse<LeaveTransaction[]>> {
+  ): Promise<ApiResponse<PaginatedResult<LeaveTransaction>>> {
+    const { page, limit } = pagination;
     const qb = this.transactionRepository
       .createQueryBuilder('tx')
       .leftJoinAndSelect('tx.leaveBalance', 'balance')
@@ -252,14 +262,16 @@ export class LeaveBalancesService {
       qb.andWhere('balance.year = :year', { year });
     }
 
-    qb.orderBy('tx.createdAt', 'DESC');
+    qb.orderBy('tx.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-    const transactions = await qb.getMany();
+    const [items, total] = await qb.getManyAndCount();
 
     return {
       success: true,
       message: 'Leave transactions retrieved',
-      data: transactions,
+      data: paginate(items, total, page, limit),
     };
   }
 

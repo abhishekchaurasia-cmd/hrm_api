@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -21,6 +22,7 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { AssignTimeTrackingPolicyDto } from './dto/assign-time-tracking-policy.dto.js';
 import { CreateTimeTrackingPolicyDto } from './dto/create-time-tracking-policy.dto.js';
 import { UpdateTimeTrackingPolicyDto } from './dto/update-time-tracking-policy.dto.js';
@@ -87,8 +89,11 @@ export class TimeTrackingPoliciesController {
   @Get(':id/assignments')
   @ApiOperation({ summary: 'Get policy assignments (HR only)' })
   @ApiResponse({ status: 200, description: 'Assignments retrieved' })
-  findAssignments(@Param('id', ParseUUIDPipe) id: string) {
-    return this.policiesService.findAssignments(id);
+  findAssignments(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() pagination: PaginationQueryDto
+  ) {
+    return this.policiesService.findAssignments(id, pagination);
   }
 
   @Delete(':id/assignments/:assignmentId')

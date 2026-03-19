@@ -7,7 +7,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 
 import { CreateShiftDto } from './dto/create-shift.dto.js';
 import type { SetWeeklyOffsDto } from './dto/set-weekly-offs.dto.js';
@@ -47,14 +50,23 @@ export class ShiftsService {
     return { success: true, message: 'Shift created', data: saved };
   }
 
-  async findAll(): Promise<ApiResponse<Shift[]>> {
-    const shifts = await this.shiftRepository.find({
+  async findAll(
+    pagination: PaginationQueryDto
+  ): Promise<ApiResponse<PaginatedResult<Shift>>> {
+    const { page, limit } = pagination;
+    const [items, total] = await this.shiftRepository.findAndCount({
       where: { isActive: true },
       relations: ['weeklyOffs'],
       order: { name: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    return { success: true, message: 'Shifts retrieved', data: shifts };
+    return {
+      success: true,
+      message: 'Shifts retrieved',
+      data: paginate(items, total, page, limit),
+    };
   }
 
   async findOne(id: string): Promise<ApiResponse<Shift>> {

@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -117,5 +118,65 @@ export class AttendanceController {
   @ApiResponse({ status: 200, description: 'HR attendance list retrieved' })
   getHrToday(@CurrentUser() user: AuthUser) {
     return this.attendanceService.getHrTodayAttendance(user);
+  }
+
+  @Get('api/v1/attendance/me/detailed-report')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get detailed attendance report for current user' })
+  @ApiQuery({ name: 'month', required: false, description: 'Month (1-12)' })
+  @ApiQuery({ name: 'year', required: false, description: 'Year' })
+  @ApiResponse({ status: 200, description: 'Detailed report retrieved' })
+  getMyDetailedReport(
+    @CurrentUser() user: AuthUser,
+    @Query('month') month?: string,
+    @Query('year') year?: string
+  ) {
+    const now = new Date();
+    const m = month ? parseInt(month, 10) : now.getMonth() + 1;
+    const y = year ? parseInt(year, 10) : now.getFullYear();
+    return this.attendanceService.getDetailedReport(user.id, m, y);
+  }
+
+  @Get('api/v1/hr/attendance/employee/:userId/detailed-report')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HR)
+  @ApiOperation({
+    summary: 'Get detailed attendance report for an employee (HR only)',
+  })
+  @ApiParam({ name: 'userId', description: 'Employee user ID' })
+  @ApiQuery({ name: 'month', required: false, description: 'Month (1-12)' })
+  @ApiQuery({ name: 'year', required: false, description: 'Year' })
+  @ApiResponse({
+    status: 200,
+    description: 'Employee detailed report retrieved',
+  })
+  getEmployeeDetailedReport(
+    @Param('userId') userId: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string
+  ) {
+    const now = new Date();
+    const m = month ? parseInt(month, 10) : now.getMonth() + 1;
+    const y = year ? parseInt(year, 10) : now.getFullYear();
+    return this.attendanceService.getDetailedReport(userId, m, y);
+  }
+
+  @Get('api/v1/hr/attendance/monthly-summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HR)
+  @ApiOperation({
+    summary: 'Get monthly attendance summary for all employees (HR only)',
+  })
+  @ApiQuery({ name: 'month', required: false, description: 'Month (1-12)' })
+  @ApiQuery({ name: 'year', required: false, description: 'Year' })
+  @ApiResponse({ status: 200, description: 'Monthly summary retrieved' })
+  getHrMonthlySummary(
+    @Query('month') month?: string,
+    @Query('year') year?: string
+  ) {
+    const now = new Date();
+    const m = month ? parseInt(month, 10) : now.getMonth() + 1;
+    const y = year ? parseInt(year, 10) : now.getFullYear();
+    return this.attendanceService.getHrMonthlySummary(m, y);
   }
 }

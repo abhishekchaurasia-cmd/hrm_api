@@ -22,12 +22,16 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser());
 
-  const corsOrigin = configService.get<string>(
+  const corsOriginRaw = configService.get<string>(
     'security.corsOrigin',
     'http://localhost:3000'
   );
+  const corsOrigins = corsOriginRaw
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: corsOrigin,
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

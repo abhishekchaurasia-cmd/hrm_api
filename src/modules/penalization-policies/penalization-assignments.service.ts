@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 import { User } from '../users/entities/user.entity.js';
 
 import { PenalizationPolicyAssignment } from './entities/penalization-policy-assignment.entity.js';
@@ -81,8 +84,10 @@ export class PenalizationAssignmentsService {
   }
 
   async findByPolicy(
-    policyId: string
-  ): Promise<ApiResponse<PenalizationPolicyAssignment[]>> {
+    policyId: string,
+    pagination: PaginationQueryDto
+  ): Promise<ApiResponse<PaginatedResult<PenalizationPolicyAssignment>>> {
+    const { page, limit } = pagination;
     const policy = await this.policyRepository.findOne({
       where: { id: policyId },
     });
@@ -92,16 +97,18 @@ export class PenalizationAssignmentsService {
       );
     }
 
-    const assignments = await this.assignmentRepository.find({
+    const [items, total] = await this.assignmentRepository.findAndCount({
       where: { policyId, isActive: true },
       relations: ['user'],
       order: { assignedAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return {
       success: true,
       message: 'Policy assignments retrieved',
-      data: assignments,
+      data: paginate(items, total, page, limit),
     };
   }
 

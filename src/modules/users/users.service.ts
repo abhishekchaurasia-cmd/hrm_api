@@ -8,7 +8,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
@@ -48,15 +51,25 @@ export class UsersService {
     };
   }
 
-  async findAll(): Promise<ApiResponse<UserResponse[]>> {
-    const users = await this.userRepository.find({
+  async findAll(
+    pagination: PaginationQueryDto
+  ): Promise<ApiResponse<PaginatedResult<UserResponse>>> {
+    const { page, limit } = pagination;
+    const [users, total] = await this.userRepository.findAndCount({
       order: { firstName: 'ASC', lastName: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return {
       success: true,
       message: 'Users retrieved',
-      data: users.map(u => this.toUserResponse(u)),
+      data: paginate(
+        users.map(u => this.toUserResponse(u)),
+        total,
+        page,
+        limit
+      ),
     };
   }
 

@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Not, Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 import { User } from '../users/entities/user.entity.js';
 
 import type { CreateTimeTrackingPolicyDto } from './dto/create-time-tracking-policy.dto.js';
@@ -272,8 +275,10 @@ export class TimeTrackingPoliciesService {
   }
 
   async findAssignments(
-    policyId: string
-  ): Promise<ApiResponse<TimeTrackingPolicyAssignment[]>> {
+    policyId: string,
+    pagination: PaginationQueryDto
+  ): Promise<ApiResponse<PaginatedResult<TimeTrackingPolicyAssignment>>> {
+    const { page, limit } = pagination;
     const policy = await this.policyRepository.findOne({
       where: { id: policyId },
     });
@@ -283,16 +288,18 @@ export class TimeTrackingPoliciesService {
       );
     }
 
-    const assignments = await this.assignmentRepository.find({
+    const [items, total] = await this.assignmentRepository.findAndCount({
       where: { policyId, isActive: true },
       relations: ['user'],
       order: { assignedAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return {
       success: true,
       message: 'Policy assignments retrieved',
-      data: assignments,
+      data: paginate(items, total, page, limit),
     };
   }
 
