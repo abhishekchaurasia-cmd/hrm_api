@@ -15,6 +15,7 @@ import { paginate } from '../../common/utils/paginate.js';
 
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { EmployeeProfile } from './entities/employee-profile.entity.js';
 import { User, UserRole } from './entities/user.entity.js';
 
 export interface UserResponse {
@@ -34,6 +35,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(EmployeeProfile)
+    private readonly profileRepository: Repository<EmployeeProfile>,
     private readonly configService: ConfigService
   ) {}
 
@@ -174,13 +177,74 @@ export class UsersService {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
 
-    user.isActive = false;
-    await this.userRepository.save(user);
+    await this.userRepository.remove(user);
 
     return {
       success: true,
-      message: 'User deactivated',
+      message: 'User permanently deleted',
       data: null,
+    };
+  }
+
+  async getUpcomingBirthdays(days = 7): Promise<
+    ApiResponse<
+      Array<{
+        userId: string;
+        firstName: string;
+        lastName: string;
+        dateOfBirth: string;
+        department: string | null;
+      }>
+    >
+  > {
+    const today = new Date();
+    const pairs: Array<{ month: number; day: number }> = [];
+    for (let i = 0; i <= days; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      pairs.push({ month: d.getMonth() + 1, day: d.getDate() });
+    }
+
+    const conditions = pairs
+      .map(
+        (_, i) =>
+          `(EXTRACT(MONTH FROM ep."dateOfBirth") = :m${i} AND EXTRACT(DAY FROM ep."dateOfBirth") = :d${i})`
+      )
+      .join(' OR ');
+
+    const params: Record<string, number> = {};
+    pairs.forEach((p, i) => {
+      params[`m${i}`] = p.month;
+      params[`d${i}`] = p.day;
+    });
+
+    const results: Array<{
+      userId: string;
+      firstName: string;
+      lastName: string;
+      dateOfBirth: string;
+      department: string | null;
+    }> = await this.profileRepository
+      .createQueryBuilder('ep')
+      .innerJoin('ep.user', 'u')
+      .leftJoin('u.department', 'dept')
+      .select([
+        'u.id AS "userId"',
+        'u."firstName" AS "firstName"',
+        'u."lastName" AS "lastName"',
+        'ep."dateOfBirth" AS "dateOfBirth"',
+        'dept.name AS "department"',
+      ])
+      .where('ep."dateOfBirth" IS NOT NULL')
+      .andWhere('u."isActive" = true')
+      .andWhere(`(${conditions})`)
+      .setParameters(params)
+      .getRawMany();
+
+    return {
+      success: true,
+      message: 'Upcoming birthdays retrieved',
+      data: results,
     };
   }
 }

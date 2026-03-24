@@ -12,13 +12,13 @@ import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { LeaveBalancesService } from '../leave-policies/leave-balances.service.js';
 import { LeavePlanAssignmentsService } from '../leave-policies/leave-plan-assignments.service.js';
 import { ShiftAssignmentsService } from '../shifts/shift-assignments.service.js';
-import { UserRole } from '../users/entities/user.entity.js';
+import { User, UserRole } from '../users/entities/user.entity.js';
 
 import type { ApproveRejectLeaveDto } from './dto/approve-reject-leave.dto.js';
 import { CreateLeaveDto } from './dto/create-leave.dto.js';
 import type { HrLeavesQueryDto } from './dto/hr-leaves-query.dto.js';
 import { ReviewLeaveDto } from './dto/review-leave.dto.js';
-import { Leave, LeaveStatus } from './entities/leave.entity.js';
+import { Leave, LeaveStatus, LeaveType } from './entities/leave.entity.js';
 
 export interface LeaveFilters {
   status?: LeaveStatus;
@@ -36,6 +36,8 @@ export class LeavesService {
   constructor(
     @InjectRepository(Leave)
     private readonly leaveRepository: Repository<Leave>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly balancesService: LeaveBalancesService,
     private readonly planAssignmentsService: LeavePlanAssignmentsService,
     private readonly shiftAssignmentsService: ShiftAssignmentsService
@@ -106,6 +108,8 @@ export class LeavesService {
     user: AuthUser,
     dto: CreateLeaveDto
   ): Promise<ApiResponse<Leave>> {
+    const isSystemUnpaid = dto.leaveTypeConfigId === 'unpaid';
+
     if (!dto.leaveType && !dto.leaveTypeConfigId) {
       throw new BadRequestException(
         'Either leaveType or leaveTypeConfigId is required'
@@ -149,7 +153,9 @@ export class LeavesService {
 
     let isUnlimited = false;
 
-    if (dto.leaveTypeConfigId) {
+    if (isSystemUnpaid) {
+      isUnlimited = true;
+    } else if (dto.leaveTypeConfigId) {
       const assignment =
         await this.planAssignmentsService.getActiveAssignmentForUser(user.id);
 
@@ -187,8 +193,10 @@ export class LeavesService {
 
     const leave = this.leaveRepository.create({
       userId: user.id,
-      leaveType: dto.leaveType ?? null,
-      leaveTypeConfigId: dto.leaveTypeConfigId ?? null,
+      leaveType: isSystemUnpaid ? LeaveType.UNPAID : (dto.leaveType ?? null),
+      leaveTypeConfigId: isSystemUnpaid
+        ? null
+        : (dto.leaveTypeConfigId ?? null),
       startDate: dto.startDate,
       endDate: dto.endDate,
       numberOfDays,
@@ -200,7 +208,7 @@ export class LeavesService {
 
     const saved = await this.leaveRepository.save(leave);
 
-    if (dto.leaveTypeConfigId && !isUnlimited) {
+    if (dto.leaveTypeConfigId && !isUnlimited && !isSystemUnpaid) {
       const year = new Date(dto.startDate).getFullYear();
       await this.balancesService.deductBalance(
         user.id,
@@ -323,51 +331,86 @@ export class LeavesService {
     const assignment =
       await this.planAssignmentsService.getActiveAssignmentForUser(user.id);
 
-    if (!assignment || !assignment.leavePlan) {
-      return {
-        success: true,
-        message: 'No active leave plan assigned',
-        data: { planName: null, leaveTypes: [] },
-      };
+    const year = new Date().getFullYear();
+    let planName: string | null = null;
+    let planId: string | null = null;
+    const leaveTypes: Array<Record<string, unknown>> = [];
+
+    if (assignment?.leavePlan) {
+      planName = assignment.leavePlan.name;
+      planId = assignment.leavePlan.id;
+
+      const activeConfigs = (
+        assignment.leavePlan.leaveTypeConfigs ?? []
+      ).filter(c => c.isActive);
+
+      const configTypes = await Promise.all(
+        activeConfigs.map(async config => {
+          const balance = await this.balancesService.getBalanceForLeaveType(
+            user.id,
+            config.id,
+            year
+          );
+
+          return {
+            id: config.id,
+            name: config.name,
+            code: config.code,
+            quota: config.isUnlimited ? null : Number(config.quota),
+            isUnlimited: config.isUnlimited,
+            isPaid: config.isPaid,
+            balance: balance ? Number(balance.balance) : 0,
+            used: balance ? Number(balance.used) : 0,
+            allocated: balance ? Number(balance.allocated) : 0,
+            carriedForward: balance ? Number(balance.carriedForward) : 0,
+          };
+        })
+      );
+
+      leaveTypes.push(...configTypes);
     }
 
-    const activeConfigs = (assignment.leavePlan.leaveTypeConfigs ?? []).filter(
-      c => c.isActive
+    const hasUnpaidConfig = leaveTypes.some(
+      t => t.isPaid === false && t.isUnlimited === true
     );
-    const year = new Date().getFullYear();
 
-    const leaveTypes = await Promise.all(
-      activeConfigs.map(async config => {
-        const balance = await this.balancesService.getBalanceForLeaveType(
-          user.id,
-          config.id,
-          year
-        );
+    if (!hasUnpaidConfig) {
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
 
-        return {
-          id: config.id,
-          name: config.name,
-          code: config.code,
-          quota: config.isUnlimited ? null : Number(config.quota),
-          isUnlimited: config.isUnlimited,
-          isPaid: config.isPaid,
-          balance: balance ? Number(balance.balance) : 0,
-          used: balance ? Number(balance.used) : 0,
-          allocated: balance ? Number(balance.allocated) : 0,
-          carriedForward: balance ? Number(balance.carriedForward) : 0,
-        };
-      })
-    );
+      const unpaidUsedResult: { total: string | null } | undefined =
+        await this.leaveRepository
+          .createQueryBuilder('leave')
+          .select('COALESCE(SUM(leave."numberOfDays"), 0)', 'total')
+          .where('leave."userId" = :userId', { userId: user.id })
+          .andWhere('leave."leaveType" = :lt', { lt: LeaveType.UNPAID })
+          .andWhere('leave."startDate" >= :yearStart', { yearStart })
+          .andWhere('leave."startDate" <= :yearEnd', { yearEnd })
+          .andWhere('leave.status NOT IN (:...excluded)', {
+            excluded: [LeaveStatus.CANCELLED, LeaveStatus.REJECTED],
+          })
+          .getRawOne();
+
+      const unpaidUsed = Number(unpaidUsedResult?.total ?? 0);
+
+      leaveTypes.push({
+        id: 'unpaid',
+        name: 'Unpaid Leave',
+        code: 'UL',
+        quota: null,
+        isUnlimited: true,
+        isPaid: false,
+        balance: 0,
+        used: unpaidUsed,
+        allocated: 0,
+        carriedForward: 0,
+      });
+    }
 
     return {
       success: true,
       message: 'Available leave types retrieved',
-      data: {
-        planName: assignment.leavePlan.name,
-        planId: assignment.leavePlan.id,
-        year,
-        leaveTypes,
-      },
+      data: { planName, planId, year, leaveTypes },
     };
   }
 
@@ -615,6 +658,74 @@ export class LeavesService {
         totalPages: Math.ceil(total / limit),
         statusCounts,
       },
+    };
+  }
+
+  async getTeamOnLeave(user: AuthUser): Promise<
+    ApiResponse<
+      Array<{
+        userId: string;
+        firstName: string;
+        lastName: string;
+        leaveType: string | null;
+        leaveTypeName: string | null;
+        startDate: string;
+        endDate: string;
+        isHalfDay: boolean;
+      }>
+    >
+  > {
+    const currentUser = await this.userRepository.findOne({
+      where: { id: user.id },
+      select: ['id', 'departmentId'],
+    });
+
+    if (!currentUser?.departmentId) {
+      return {
+        success: true,
+        message: 'No department assigned',
+        data: [],
+      };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const results: Array<{
+      userId: string;
+      firstName: string;
+      lastName: string;
+      leaveType: string | null;
+      leaveTypeName: string | null;
+      startDate: string;
+      endDate: string;
+      isHalfDay: boolean;
+    }> = await this.leaveRepository
+      .createQueryBuilder('leave')
+      .innerJoin('leave.user', 'u')
+      .leftJoin('leave.leaveTypeConfig', 'ltc')
+      .select([
+        'u.id AS "userId"',
+        'u."firstName" AS "firstName"',
+        'u."lastName" AS "lastName"',
+        'leave."leaveType" AS "leaveType"',
+        'ltc.name AS "leaveTypeName"',
+        'leave."startDate" AS "startDate"',
+        'leave."endDate" AS "endDate"',
+        'leave."isHalfDay" AS "isHalfDay"',
+      ])
+      .where('leave.status = :status', { status: LeaveStatus.APPROVED })
+      .andWhere('leave."startDate" <= :today', { today })
+      .andWhere('leave."endDate" >= :today', { today })
+      .andWhere('u."departmentId" = :deptId', {
+        deptId: currentUser.departmentId,
+      })
+      .andWhere('leave."userId" != :userId', { userId: user.id })
+      .getRawMany();
+
+    return {
+      success: true,
+      message: 'Team on leave retrieved',
+      data: results,
     };
   }
 }

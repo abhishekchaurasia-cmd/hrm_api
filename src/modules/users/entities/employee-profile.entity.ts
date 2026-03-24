@@ -44,7 +44,8 @@ export class EmployeeProfile {
 
   @OneToOne(
     'User',
-    (user: User & { profile?: EmployeeProfile }) => user.profile
+    (user: User & { profile?: EmployeeProfile }) => user.profile,
+    { onDelete: 'CASCADE' }
   )
   @JoinColumn({ name: 'userId' })
   user?: User;

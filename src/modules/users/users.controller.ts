@@ -42,6 +42,13 @@ export class UsersController {
     return this.usersService.findAll(pagination);
   }
 
+  @Get('upcoming-birthdays')
+  @ApiOperation({ summary: 'Get employees with birthdays in the next 7 days' })
+  @ApiResponse({ status: 200, description: 'Upcoming birthdays retrieved' })
+  getUpcomingBirthdays() {
+    return this.usersService.getUpcomingBirthdays(7);
+  }
+
   @Get('options')
   @Roles(UserRole.HR)
   @ApiOperation({

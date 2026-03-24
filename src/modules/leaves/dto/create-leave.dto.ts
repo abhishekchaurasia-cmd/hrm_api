@@ -7,7 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
+  Matches,
 } from 'class-validator';
 
 import { LeaveType } from '../entities/leave.entity.js';
@@ -22,9 +22,16 @@ export class CreateLeaveDto {
   leaveType?: LeaveType;
 
   @ApiPropertyOptional({
-    description: 'Leave type config ID from the assigned leave plan',
+    description:
+      'Leave type config ID (UUID) or "unpaid" for system unpaid leave',
   })
-  @IsUUID()
+  @IsString()
+  @Matches(
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|unpaid)$/i,
+    {
+      message: 'leaveTypeConfigId must be a valid UUID or "unpaid"',
+    }
+  )
   @IsOptional()
   leaveTypeConfigId?: string;
 

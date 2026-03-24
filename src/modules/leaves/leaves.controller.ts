@@ -58,6 +58,16 @@ export class LeavesController {
     return this.leavesService.getAvailableLeaveTypes(user);
   }
 
+  @Get('api/v1/leaves/team-on-leave')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get team members on leave today (same department)',
+  })
+  @ApiResponse({ status: 200, description: 'Team on leave retrieved' })
+  getTeamOnLeave(@CurrentUser() user: AuthUser) {
+    return this.leavesService.getTeamOnLeave(user);
+  }
+
   @Get('api/v1/leaves/me')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get my leave requests with optional filtering' })

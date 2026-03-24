@@ -748,11 +748,11 @@ export class AttendanceService {
         punchIn: attendance?.punchInAt ?? null,
         punchOut: attendance?.punchOutAt ?? null,
         totalHours:
-          attendance?.totalMinutes !== null
+          attendance !== undefined && attendance.totalMinutes !== null
             ? Math.round((attendance.totalMinutes / 60) * 100) / 100
             : null,
         effectiveHours:
-          attendance?.effectiveMinutes !== null
+          attendance !== undefined && attendance.effectiveMinutes !== null
             ? Math.round((attendance.effectiveMinutes / 60) * 100) / 100
             : null,
         lateByMinutes: attendance?.lateByMinutes ?? null,
