@@ -32,6 +32,14 @@ import { DepartmentsService } from './departments.service.js';
 export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 
+  @Get('options')
+  @Roles(UserRole.HR)
+  @ApiOperation({ summary: 'Get department options for dropdowns (HR only)' })
+  @ApiResponse({ status: 200, description: 'Department options retrieved' })
+  findAllOptions() {
+    return this.departmentsService.findAllOptions();
+  }
+
   @Get()
   @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get all departments (HR only)' })

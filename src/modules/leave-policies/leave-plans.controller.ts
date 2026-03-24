@@ -53,6 +53,13 @@ export class LeavePlansController {
     return this.plansService.create(dto);
   }
 
+  @Get('options')
+  @ApiOperation({ summary: 'Get leave plan options for dropdowns (HR only)' })
+  @ApiResponse({ status: 200, description: 'Leave plan options retrieved' })
+  findAllOptions() {
+    return this.plansService.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all leave plans (HR only)' })
   @ApiResponse({ status: 200, description: 'Leave plans retrieved' })

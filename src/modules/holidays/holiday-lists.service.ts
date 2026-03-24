@@ -36,6 +36,19 @@ export class HolidayListsService {
     private readonly publicHolidaysService: PublicHolidaysService
   ) {}
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.listRepo.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Holiday list options retrieved',
+      data: items,
+    };
+  }
+
   async createList(
     dto: CreateHolidayListDto
   ): Promise<ApiResponse<HolidayList>> {

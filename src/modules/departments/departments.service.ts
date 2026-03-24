@@ -19,6 +19,19 @@ export class DepartmentsService {
     private readonly departmentRepository: Repository<Department>
   ) {}
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.departmentRepository.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Department options retrieved',
+      data: items,
+    };
+  }
+
   async findAll(): Promise<ApiResponse<Department[]>> {
     const departments = await this.departmentRepository.find({
       order: { name: 'ASC' },

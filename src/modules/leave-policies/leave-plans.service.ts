@@ -36,6 +36,19 @@ export class LeavePlansService {
     return { success: true, message: 'Leave plan created', data: saved };
   }
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.planRepository.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Leave plan options retrieved',
+      data: items,
+    };
+  }
+
   async findAll(
     pagination: PaginationQueryDto
   ): Promise<ApiResponse<PaginatedResult<LeavePlan>>> {

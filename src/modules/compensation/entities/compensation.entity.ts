@@ -17,6 +17,11 @@ export enum TaxRegime {
   NEW_REGIME = 'new_regime',
 }
 
+export enum SalaryStructureType {
+  RANGE_BASED = 'range_based',
+  FIXED = 'fixed',
+}
+
 @Entity('compensations')
 export class Compensation {
   @PrimaryGeneratedColumn('uuid')
@@ -45,7 +50,23 @@ export class Compensation {
   bonus!: number;
 
   @Column({ type: 'boolean', default: false })
+  bonusIncludedInCtc!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isPfEligible!: boolean;
+
+  @Column({ type: 'boolean', default: false })
   isEsiEligible!: boolean;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  payGroup!: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: SalaryStructureType,
+    default: SalaryStructureType.RANGE_BASED,
+  })
+  salaryStructureType!: SalaryStructureType;
 
   @Column({
     type: 'enum',

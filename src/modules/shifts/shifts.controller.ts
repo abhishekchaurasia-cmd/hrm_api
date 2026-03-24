@@ -44,6 +44,13 @@ export class ShiftsController {
     return this.shiftsService.create(dto);
   }
 
+  @Get('options')
+  @ApiOperation({ summary: 'Get shift options for dropdowns (HR only)' })
+  @ApiResponse({ status: 200, description: 'Shift options retrieved' })
+  findAllOptions() {
+    return this.shiftsService.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all active shifts (HR only)' })
   @ApiResponse({ status: 200, description: 'Shifts retrieved' })

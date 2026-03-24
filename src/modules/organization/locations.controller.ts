@@ -38,6 +38,13 @@ export class LocationsController {
     return this.service.create(dto);
   }
 
+  @Get('options')
+  @ApiOperation({ summary: 'Get location options for dropdowns (HR only)' })
+  @ApiResponse({ status: 200, description: 'Location options retrieved' })
+  findAllOptions() {
+    return this.service.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all locations (HR only)' })
   @ApiResponse({ status: 200, description: 'Locations retrieved' })

@@ -50,6 +50,15 @@ export class ShiftsService {
     return { success: true, message: 'Shift created', data: saved };
   }
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.shiftRepository.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return { success: true, message: 'Shift options retrieved', data: items };
+  }
+
   async findAll(
     pagination: PaginationQueryDto
   ): Promise<ApiResponse<PaginatedResult<Shift>>> {

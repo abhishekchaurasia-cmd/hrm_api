@@ -38,6 +38,13 @@ export class LegalEntitiesController {
     return this.service.create(dto);
   }
 
+  @Get('options')
+  @ApiOperation({ summary: 'Get legal entity options for dropdowns (HR only)' })
+  @ApiResponse({ status: 200, description: 'Legal entity options retrieved' })
+  findAllOptions() {
+    return this.service.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all legal entities (HR only)' })
   @ApiResponse({ status: 200, description: 'Legal entities retrieved' })

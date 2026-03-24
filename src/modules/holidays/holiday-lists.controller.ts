@@ -53,6 +53,15 @@ export class HolidayListsController {
     return this.service.createList(dto);
   }
 
+  @Get('options')
+  @ApiOperation({
+    summary: 'Get holiday list options for dropdowns (HR only)',
+  })
+  @ApiResponse({ status: 200, description: 'Holiday list options retrieved' })
+  findAllOptions() {
+    return this.service.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({
     summary: 'List all holiday lists with employee/holiday counts (HR only)',

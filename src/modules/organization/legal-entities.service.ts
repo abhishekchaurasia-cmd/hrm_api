@@ -31,6 +31,19 @@ export class LegalEntitiesService {
     return { success: true, message: 'Legal entity created', data: saved };
   }
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.repo.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Legal entity options retrieved',
+      data: items,
+    };
+  }
+
   async findAll(): Promise<ApiResponse<LegalEntity[]>> {
     const items = await this.repo.find({ order: { name: 'ASC' } });
     return { success: true, message: 'Legal entities retrieved', data: items };
