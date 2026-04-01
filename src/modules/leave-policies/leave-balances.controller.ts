@@ -23,8 +23,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto.js';
+import {
+  LeaveBalanceQueryDto,
+  LeaveTransactionQueryDto,
+} from './dto/leave-balance-query.dto.js';
 import { LeaveBalancesService } from './leave-balances.service.js';
 
 @ApiTags('leave-balances')
@@ -61,22 +64,10 @@ export class LeaveBalancesController {
   @Get()
   @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get all leave balances (HR only)' })
-  @ApiQuery({ name: 'userId', required: false })
-  @ApiQuery({ name: 'planId', required: false })
-  @ApiQuery({ name: 'year', required: false })
   @ApiResponse({ status: 200, description: 'Balances retrieved' })
-  findAll(
-    @Query() pagination: PaginationQueryDto,
-    @Query('userId') userId?: string,
-    @Query('planId') planId?: string,
-    @Query('year') year?: string
-  ) {
-    return this.balancesService.findAll(
-      pagination,
-      userId,
-      planId,
-      year ? parseInt(year, 10) : undefined
-    );
+  findAll(@Query() query: LeaveBalanceQueryDto) {
+    const { page, limit, userId, planId, year } = query;
+    return this.balancesService.findAll({ page, limit }, userId, planId, year);
   }
 
   @Get('employee/:userId')
@@ -105,18 +96,9 @@ export class LeaveBalancesController {
   @Get('transactions')
   @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get leave transaction audit log (HR only)' })
-  @ApiQuery({ name: 'userId', required: false })
-  @ApiQuery({ name: 'year', required: false })
   @ApiResponse({ status: 200, description: 'Transactions retrieved' })
-  getTransactions(
-    @Query() pagination: PaginationQueryDto,
-    @Query('userId') userId?: string,
-    @Query('year') year?: string
-  ) {
-    return this.balancesService.getTransactions(
-      pagination,
-      userId,
-      year ? parseInt(year, 10) : undefined
-    );
+  getTransactions(@Query() query: LeaveTransactionQueryDto) {
+    const { page, limit, userId, year } = query;
+    return this.balancesService.getTransactions({ page, limit }, userId, year);
   }
 }
