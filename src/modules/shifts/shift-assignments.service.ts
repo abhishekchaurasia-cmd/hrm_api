@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { User } from '../users/entities/user.entity.js';
 
@@ -67,9 +70,11 @@ export class ShiftAssignmentsService {
   }
 
   async findAll(
+    pagination: PaginationQueryDto,
     userId?: string,
     shiftId?: string
-  ): Promise<ApiResponse<ShiftAssignment[]>> {
+  ): Promise<ApiResponse<PaginatedResult<ShiftAssignment>>> {
+    const { page, limit } = pagination;
     const where: Record<string, unknown> = { isActive: true };
     if (userId) {
       where.userId = userId;
@@ -78,16 +83,18 @@ export class ShiftAssignmentsService {
       where.shiftId = shiftId;
     }
 
-    const assignments = await this.assignmentRepository.find({
+    const [items, total] = await this.assignmentRepository.findAndCount({
       where,
       relations: ['user', 'shift'],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return {
       success: true,
       message: 'Shift assignments retrieved',
-      data: assignments,
+      data: paginate(items, total, page, limit),
     };
   }
 

@@ -19,6 +19,19 @@ export class BusinessUnitsService {
     return { success: true, message: 'Business unit created', data: saved };
   }
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.repo.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Business unit options retrieved',
+      data: items,
+    };
+  }
+
   async findAll(): Promise<ApiResponse<BusinessUnit[]>> {
     const items = await this.repo.find({
       order: { name: 'ASC' },

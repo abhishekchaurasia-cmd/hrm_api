@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateShiftAssignmentDto } from './dto/create-shift-assignment.dto.js';
 import { UpdateShiftAssignmentDto } from './dto/update-shift-assignment.dto.js';
 import { ShiftAssignmentsService } from './shift-assignments.service.js';
@@ -50,10 +51,11 @@ export class ShiftAssignmentsController {
   @ApiQuery({ name: 'shiftId', required: false })
   @ApiResponse({ status: 200, description: 'Assignments retrieved' })
   findAll(
+    @Query() pagination: PaginationQueryDto,
     @Query('userId') userId?: string,
     @Query('shiftId') shiftId?: string
   ) {
-    return this.assignmentsService.findAll(userId, shiftId);
+    return this.assignmentsService.findAll(pagination, userId, shiftId);
   }
 
   @Get('employee/:userId')

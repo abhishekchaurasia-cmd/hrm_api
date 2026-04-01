@@ -1,37 +1,51 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { join } from 'path';
 
 import { AllExceptionsFilter } from './common/filters/http-exception.filter.js';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
 
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+  );
   app.use(compression());
   app.use(cookieParser());
 
-  const corsOrigin = configService.get<string>(
+  const corsOriginRaw = configService.get<string>(
     'security.corsOrigin',
     'http://localhost:3000'
   );
+  const corsOrigins = corsOriginRaw
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: corsOrigin,
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
+
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
   app.useGlobalPipes(
     new ValidationPipe({

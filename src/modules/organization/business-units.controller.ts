@@ -38,6 +38,15 @@ export class BusinessUnitsController {
     return this.service.create(dto);
   }
 
+  @Get('options')
+  @ApiOperation({
+    summary: 'Get business unit options for dropdowns (HR only)',
+  })
+  @ApiResponse({ status: 200, description: 'Business unit options retrieved' })
+  findAllOptions() {
+    return this.service.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all business units (HR only)' })
   @ApiResponse({ status: 200, description: 'Business units retrieved' })

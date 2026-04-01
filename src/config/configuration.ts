@@ -42,6 +42,8 @@ export const configurationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'debug', 'verbose')
     .default('info'),
+
+  CALENDARIFIC_API_KEY: Joi.string().default(''),
 });
 
 export default () => ({
@@ -90,5 +92,8 @@ export default () => ({
   },
   logging: {
     level: process.env.LOG_LEVEL ?? 'info',
+  },
+  calendarific: {
+    apiKey: process.env.CALENDARIFIC_API_KEY ?? '',
   },
 });

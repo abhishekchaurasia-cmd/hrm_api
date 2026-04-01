@@ -20,6 +20,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -50,6 +51,15 @@ export class HolidayListsController {
   @ApiResponse({ status: 201, description: 'Holiday list created' })
   createList(@Body() dto: CreateHolidayListDto) {
     return this.service.createList(dto);
+  }
+
+  @Get('options')
+  @ApiOperation({
+    summary: 'Get holiday list options for dropdowns (HR only)',
+  })
+  @ApiResponse({ status: 200, description: 'Holiday list options retrieved' })
+  findAllOptions() {
+    return this.service.findAllOptions();
   }
 
   @Get()
@@ -181,8 +191,11 @@ export class HolidayListsController {
     summary: 'Get employees assigned to this holiday list (HR only)',
   })
   @ApiResponse({ status: 200, description: 'Employees retrieved' })
-  getListEmployees(@Param('listId', ParseUUIDPipe) listId: string) {
-    return this.service.getListEmployees(listId);
+  getListEmployees(
+    @Param('listId', ParseUUIDPipe) listId: string,
+    @Query() pagination: PaginationQueryDto
+  ) {
+    return this.service.getListEmployees(listId, pagination);
   }
 
   @Get(':listId/employees/unassigned')
@@ -198,9 +211,14 @@ export class HolidayListsController {
   })
   getUnassignedEmployees(
     @Param('listId', ParseUUIDPipe) listId: string,
+    @Query() pagination: PaginationQueryDto,
     @Query('search') search?: string
   ) {
-    return this.service.getUnassignedEmployees(listId, search || undefined);
+    return this.service.getUnassignedEmployees(
+      listId,
+      pagination,
+      search || undefined
+    );
   }
 
   @Post(':listId/employees/assign')

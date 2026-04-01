@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -21,6 +22,7 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UserRole } from './entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UsersService } from './users.service.js';
@@ -36,8 +38,15 @@ export class UsersController {
   @Roles(UserRole.HR)
   @ApiOperation({ summary: 'Get all users (HR only)' })
   @ApiResponse({ status: 200, description: 'Users retrieved' })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() pagination: PaginationQueryDto) {
+    return this.usersService.findAll(pagination);
+  }
+
+  @Get('upcoming-birthdays')
+  @ApiOperation({ summary: 'Get employees with birthdays in the next 7 days' })
+  @ApiResponse({ status: 200, description: 'Upcoming birthdays retrieved' })
+  getUpcomingBirthdays() {
+    return this.usersService.getUpcomingBirthdays(7);
   }
 
   @Get('options')

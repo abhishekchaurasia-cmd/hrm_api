@@ -19,7 +19,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { TaxRegime } from '../../compensation/entities/compensation.entity.js';
+import {
+  SalaryStructureType,
+  TaxRegime,
+} from '../../compensation/entities/compensation.entity.js';
 import {
   Gender,
   TimeType,
@@ -231,9 +234,10 @@ class CompensationDetailsDto {
   @MaxLength(10)
   currency?: string;
 
-  @ApiProperty({ example: '2026-03-01' })
+  @ApiPropertyOptional({ example: '2026-03-01' })
   @IsDateString()
-  salaryEffectiveFrom!: string;
+  @IsOptional()
+  salaryEffectiveFrom?: string;
 
   @ApiProperty({ example: 1100000 })
   @IsNumber()
@@ -249,7 +253,31 @@ class CompensationDetailsDto {
   @ApiPropertyOptional({ default: false })
   @IsBoolean()
   @IsOptional()
+  bonusIncludedInCtc?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsBoolean()
+  @IsOptional()
+  isPfEligible?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsBoolean()
+  @IsOptional()
   isEsiEligible?: boolean;
+
+  @ApiPropertyOptional({ example: 'Default pay group' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  payGroup?: string;
+
+  @ApiPropertyOptional({
+    enum: SalaryStructureType,
+    default: SalaryStructureType.RANGE_BASED,
+  })
+  @IsEnum(SalaryStructureType)
+  @IsOptional()
+  salaryStructureType?: SalaryStructureType;
 
   @ApiPropertyOptional({ enum: TaxRegime })
   @IsEnum(TaxRegime)

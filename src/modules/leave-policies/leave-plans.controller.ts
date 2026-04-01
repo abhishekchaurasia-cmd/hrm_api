@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,6 +24,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateLeavePlanDto } from './dto/create-leave-plan.dto.js';
 import { CreateLeaveTypeConfigDto } from './dto/create-leave-type-config.dto.js';
 import { UpdateLeavePlanDto } from './dto/update-leave-plan.dto.js';
@@ -51,11 +53,18 @@ export class LeavePlansController {
     return this.plansService.create(dto);
   }
 
+  @Get('options')
+  @ApiOperation({ summary: 'Get leave plan options for dropdowns (HR only)' })
+  @ApiResponse({ status: 200, description: 'Leave plan options retrieved' })
+  findAllOptions() {
+    return this.plansService.findAllOptions();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all leave plans (HR only)' })
   @ApiResponse({ status: 200, description: 'Leave plans retrieved' })
-  findAll() {
-    return this.plansService.findAll();
+  findAll(@Query() pagination: PaginationQueryDto) {
+    return this.plansService.findAll(pagination);
   }
 
   @Get(':id')

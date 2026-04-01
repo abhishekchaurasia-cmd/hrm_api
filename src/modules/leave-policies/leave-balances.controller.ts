@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto.js';
 import { LeaveBalancesService } from './leave-balances.service.js';
 
@@ -65,11 +66,13 @@ export class LeaveBalancesController {
   @ApiQuery({ name: 'year', required: false })
   @ApiResponse({ status: 200, description: 'Balances retrieved' })
   findAll(
+    @Query() pagination: PaginationQueryDto,
     @Query('userId') userId?: string,
     @Query('planId') planId?: string,
     @Query('year') year?: string
   ) {
     return this.balancesService.findAll(
+      pagination,
       userId,
       planId,
       year ? parseInt(year, 10) : undefined
@@ -106,10 +109,12 @@ export class LeaveBalancesController {
   @ApiQuery({ name: 'year', required: false })
   @ApiResponse({ status: 200, description: 'Transactions retrieved' })
   getTransactions(
+    @Query() pagination: PaginationQueryDto,
     @Query('userId') userId?: string,
     @Query('year') year?: string
   ) {
     return this.balancesService.getTransactions(
+      pagination,
       userId,
       year ? parseInt(year, 10) : undefined
     );

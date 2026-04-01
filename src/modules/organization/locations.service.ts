@@ -19,6 +19,19 @@ export class LocationsService {
     return { success: true, message: 'Location created', data: saved };
   }
 
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.repo.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Location options retrieved',
+      data: items,
+    };
+  }
+
   async findAll(): Promise<ApiResponse<Location[]>> {
     const items = await this.repo.find({ order: { name: 'ASC' } });
     return { success: true, message: 'Locations retrieved', data: items };

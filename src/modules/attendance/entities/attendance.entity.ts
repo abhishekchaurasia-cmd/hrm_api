@@ -63,6 +63,24 @@ export class Attendance {
   })
   status!: AttendanceStatus;
 
+  @Column({ type: 'boolean', default: false })
+  isAutoLogout!: boolean;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  autoLogoutReason!: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  effectiveMinutes!: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  overtimeMinutes!: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  lateByMinutes!: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  earlyLeaveMinutes!: number | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

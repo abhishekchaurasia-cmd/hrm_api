@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 
 import type { CreateLeavePlanDto } from './dto/create-leave-plan.dto.js';
 import type { UpdateLeavePlanDto } from './dto/update-leave-plan.dto.js';
@@ -33,14 +36,36 @@ export class LeavePlansService {
     return { success: true, message: 'Leave plan created', data: saved };
   }
 
-  async findAll(): Promise<ApiResponse<LeavePlan[]>> {
-    const plans = await this.planRepository.find({
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.planRepository.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Leave plan options retrieved',
+      data: items,
+    };
+  }
+
+  async findAll(
+    pagination: PaginationQueryDto
+  ): Promise<ApiResponse<PaginatedResult<LeavePlan>>> {
+    const { page, limit } = pagination;
+    const [items, total] = await this.planRepository.findAndCount({
       where: { isActive: true },
       relations: ['leaveTypeConfigs'],
       order: { year: 'DESC', name: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    return { success: true, message: 'Leave plans retrieved', data: plans };
+    return {
+      success: true,
+      message: 'Leave plans retrieved',
+      data: paginate(items, total, page, limit),
+    };
   }
 
   async findOne(id: string): Promise<ApiResponse<LeavePlan>> {

@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Brackets, MoreThanOrEqual, Repository } from 'typeorm';
 
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
+import type { PaginatedResult } from '../../common/interfaces/paginated-response.interface.js';
+import { paginate } from '../../common/utils/paginate.js';
 import { EmployeeProfile } from '../users/entities/employee-profile.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import type { BulkCreateHolidaysDto } from './dto/bulk-create-holidays.dto.js';
@@ -32,6 +35,19 @@ export class HolidayListsService {
     private readonly userRepo: Repository<User>,
     private readonly publicHolidaysService: PublicHolidaysService
   ) {}
+
+  async findAllOptions(): Promise<ApiResponse<{ id: string; name: string }[]>> {
+    const items = await this.listRepo.find({
+      where: { isActive: true },
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return {
+      success: true,
+      message: 'Holiday list options retrieved',
+      data: items,
+    };
+  }
 
   async createList(
     dto: CreateHolidayListDto
@@ -332,14 +348,16 @@ export class HolidayListsService {
   }
 
   async getListEmployees(
-    listId: string
-  ): Promise<ApiResponse<Record<string, unknown>[]>> {
+    listId: string,
+    pagination: PaginationQueryDto
+  ): Promise<ApiResponse<PaginatedResult<Record<string, unknown>>>> {
+    const { page, limit } = pagination;
     const list = await this.listRepo.findOne({ where: { id: listId } });
     if (!list) {
       throw new NotFoundException(`Holiday list with ID "${listId}" not found`);
     }
 
-    const profiles = await this.profileRepo.find({
+    const [profiles, total] = await this.profileRepo.findAndCount({
       where: { holidayListId: listId },
       relations: ['user'],
       select: {
@@ -354,9 +372,11 @@ export class HolidayListsService {
           lastName: true,
         },
       },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    const data = profiles.map(p => ({
+    const items = profiles.map(p => ({
       id: p.id,
       userId: p.userId,
       employeeNumber: p.employeeNumber,
@@ -373,7 +393,7 @@ export class HolidayListsService {
     return {
       success: true,
       message: 'Employees in holiday list retrieved',
-      data,
+      data: paginate(items, total, page, limit),
     };
   }
 
@@ -489,8 +509,10 @@ export class HolidayListsService {
 
   async getUnassignedEmployees(
     listId: string,
+    pagination: PaginationQueryDto,
     search?: string
-  ): Promise<ApiResponse<Record<string, unknown>[]>> {
+  ): Promise<ApiResponse<PaginatedResult<Record<string, unknown>>>> {
+    const { page, limit } = pagination;
     const list = await this.listRepo.findOne({ where: { id: listId } });
     if (!list) {
       throw new NotFoundException(`Holiday list with ID "${listId}" not found`);
@@ -523,11 +545,14 @@ export class HolidayListsService {
       );
     }
 
-    qb.orderBy('user.firstName', 'ASC').addOrderBy('user.lastName', 'ASC');
+    qb.orderBy('user.firstName', 'ASC')
+      .addOrderBy('user.lastName', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-    const users = await qb.getMany();
+    const [users, total] = await qb.getManyAndCount();
 
-    const data = users.map(u => ({
+    const items = users.map(u => ({
       id: u.profile?.id ?? null,
       userId: u.id,
       employeeNumber: u.profile?.employeeNumber ?? null,
@@ -542,7 +567,7 @@ export class HolidayListsService {
     return {
       success: true,
       message: 'Unassigned employees retrieved',
-      data,
+      data: paginate(items, total, page, limit),
     };
   }
 

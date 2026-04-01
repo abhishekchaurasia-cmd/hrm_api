@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateLeavePlanAssignmentDto } from './dto/create-leave-plan-assignment.dto.js';
 import { LeavePlanAssignmentsService } from './leave-plan-assignments.service.js';
 
@@ -52,8 +53,12 @@ export class LeavePlanAssignmentsController {
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'planId', required: false })
   @ApiResponse({ status: 200, description: 'Assignments retrieved' })
-  findAll(@Query('userId') userId?: string, @Query('planId') planId?: string) {
-    return this.assignmentsService.findAll(userId, planId);
+  findAll(
+    @Query() pagination: PaginationQueryDto,
+    @Query('userId') userId?: string,
+    @Query('planId') planId?: string
+  ) {
+    return this.assignmentsService.findAll(pagination, userId, planId);
   }
 
   @Delete(':id')

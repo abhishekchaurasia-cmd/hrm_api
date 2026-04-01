@@ -248,10 +248,17 @@ export class EmployeeOnboardingService {
           userId: savedUser.id,
           annualSalary: compensation.annualSalary,
           currency: compensation.currency ?? 'INR',
-          salaryEffectiveFrom: compensation.salaryEffectiveFrom,
+          salaryEffectiveFrom:
+            compensation.salaryEffectiveFrom ??
+            jobDetails?.joiningDate ??
+            new Date().toISOString().split('T')[0],
           regularSalary: compensation.regularSalary,
           bonus: compensation.bonus ?? 0,
+          bonusIncludedInCtc: compensation.bonusIncludedInCtc ?? false,
+          isPfEligible: compensation.isPfEligible ?? false,
           isEsiEligible: compensation.isEsiEligible ?? false,
+          payGroup: compensation.payGroup ?? null,
+          salaryStructureType: compensation.salaryStructureType,
           taxRegime: compensation.taxRegime,
         });
         const savedComp = await queryRunner.manager.save(Compensation, comp);
