@@ -27,7 +27,7 @@
     "migration:run": "npm run typeorm -- migration:run -d src/config/typeorm.datasource.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/config/typeorm.datasource.ts",
     "seed:hr": "ts-node src/modules/users/seeds/seed-hr-user.ts",
-    "prepare": "husky",
+    "prepare": "npx --no husky || true",
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:prod": "docker compose up --build -d"
   },

@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: hrm-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3002
+      - key: API_PREFIX
+        value: api/v1
+      - key: APP_NAME
+        value: HRM API
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: DATABASE_HOST
+        sync: false
+      - key: DATABASE_PORT
+        value: 5432
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: DATABASE_NAME
+        sync: false
+      - key: DATABASE_SSL
+        value: true
+      - key: DATABASE_LOGGING
+        value: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
+      - key: RATE_LIMIT_TTL
+        value: 60
+      - key: RATE_LIMIT_LIMIT
+        value: 100
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: SWAGGER_ENABLED
+        value: true
+      - key: SWAGGER_PATH
+        value: api/docs
+      - key: TIMEZONE
+        value: Asia/Kolkata
+      - key: LOG_LEVEL
+        value: info
+      - key: CALENDARIFIC_API_KEY
+        sync: false
