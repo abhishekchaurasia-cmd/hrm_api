@@ -12,6 +12,8 @@ import {
   Attendance,
   AttendanceStatus,
 } from '../attendance/entities/attendance.entity.js';
+import { ShiftAssignmentsService } from '../shifts/shift-assignments.service.js';
+import type { Shift } from '../shifts/entities/shift.entity.js';
 import { TimeTrackingPoliciesService } from '../time-tracking-policies/time-tracking-policies.service.js';
 import type { RegularizationSettings } from '../time-tracking-policies/types/time-tracking-policy.types.js';
 
@@ -36,7 +38,8 @@ export class RegularizationsService {
     private readonly regularizationRepository: Repository<RegularizationRequest>,
     @InjectRepository(Attendance)
     private readonly attendanceRepository: Repository<Attendance>,
-    private readonly timeTrackingPoliciesService: TimeTrackingPoliciesService
+    private readonly timeTrackingPoliciesService: TimeTrackingPoliciesService,
+    private readonly shiftAssignmentsService: ShiftAssignmentsService
   ) {}
 
   private async findWithRelations(
@@ -91,12 +94,18 @@ export class RegularizationsService {
     return `${year}-${month}-${day}`;
   }
 
+  private parseTimeToMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
   private determineStatus(
     totalMinutes: number,
-    requiredMinutes: number
+    requiredMinutes: number,
+    wasLate: boolean
   ): AttendanceStatus {
     if (totalMinutes >= requiredMinutes) {
-      return AttendanceStatus.PRESENT;
+      return wasLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
     }
     if (totalMinutes >= requiredMinutes / 2) {
       return AttendanceStatus.HALF_DAY;
@@ -453,8 +462,16 @@ export class RegularizationsService {
       });
     }
 
+    const shiftAssignment =
+      await this.shiftAssignmentsService.getActiveShiftForUser(
+        request.userId,
+        request.requestDate
+      );
+    const shift: Shift | null = shiftAssignment?.shift ?? null;
+
     attendance.punchInAt = request.requestedPunchIn;
     attendance.punchOutAt = request.requestedPunchOut;
+    attendance.shiftId = shift?.id ?? attendance.shiftId ?? null;
 
     const totalMinutes = Math.max(
       0,
@@ -466,8 +483,40 @@ export class RegularizationsService {
     );
     attendance.totalMinutes = totalMinutes;
 
-    const requiredMinutes = 9 * 60;
-    attendance.status = this.determineStatus(totalMinutes, requiredMinutes);
+    const breakMinutes = shift ? shift.breakDurationMinutes : 0;
+    const effectiveMinutes = Math.max(0, totalMinutes - breakMinutes);
+    const requiredMinutes = shift ? Number(shift.workHoursPerDay) * 60 : 9 * 60;
+    const overtimeMinutes = Math.max(0, effectiveMinutes - requiredMinutes);
+
+    attendance.effectiveMinutes = effectiveMinutes;
+    attendance.overtimeMinutes = overtimeMinutes;
+
+    let lateByMinutes = 0;
+    let earlyLeaveMinutes = 0;
+    let wasLate = false;
+
+    if (shift) {
+      const punchInMinutes =
+        request.requestedPunchIn.getHours() * 60 +
+        request.requestedPunchIn.getMinutes();
+      const shiftStartMinutes = this.parseTimeToMinutes(shift.startTime);
+      lateByMinutes = Math.max(0, punchInMinutes - shiftStartMinutes);
+      wasLate = punchInMinutes > shiftStartMinutes + shift.graceMinutes;
+
+      const punchOutMinutes =
+        request.requestedPunchOut.getHours() * 60 +
+        request.requestedPunchOut.getMinutes();
+      const shiftEndMinutes = this.parseTimeToMinutes(shift.endTime);
+      earlyLeaveMinutes = Math.max(0, shiftEndMinutes - punchOutMinutes);
+    }
+
+    attendance.lateByMinutes = lateByMinutes;
+    attendance.earlyLeaveMinutes = earlyLeaveMinutes;
+    attendance.status = this.determineStatus(
+      totalMinutes,
+      requiredMinutes,
+      wasLate
+    );
 
     await this.attendanceRepository.save(attendance);
 

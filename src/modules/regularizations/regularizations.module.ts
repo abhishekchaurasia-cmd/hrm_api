@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Attendance } from '../attendance/entities/attendance.entity.js';
+import { ShiftsModule } from '../shifts/shifts.module.js';
 import { TimeTrackingPoliciesModule } from '../time-tracking-policies/time-tracking-policies.module.js';
 
 import { RegularizationRequest } from './entities/regularization-request.entity.js';
@@ -13,6 +14,7 @@ import { RegularizationsService } from './regularizations.service.js';
   imports: [
     TypeOrmModule.forFeature([RegularizationRequest, Attendance]),
     TimeTrackingPoliciesModule,
+    ShiftsModule,
   ],
   controllers: [RegularizationsController],
   providers: [RegularizationsService, RolesGuard],

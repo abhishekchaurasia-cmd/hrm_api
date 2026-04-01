@@ -42,10 +42,17 @@ export class AttendanceAutomationService {
   ) {}
 
   private toDateString(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const tz = process.env.TIMEZONE || 'Asia/Kolkata';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const y = parts.find(p => p.type === 'year')!.value;
+    const m = parts.find(p => p.type === 'month')!.value;
+    const d = parts.find(p => p.type === 'day')!.value;
+    return `${y}-${m}-${d}`;
   }
 
   private parseTimeToMinutes(time: string): number {

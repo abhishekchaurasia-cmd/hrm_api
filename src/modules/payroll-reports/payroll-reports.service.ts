@@ -6,7 +6,13 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, LessThanOrEqual, Repository } from 'typeorm';
+import {
+  Between,
+  DataSource,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
 import {
@@ -26,6 +32,7 @@ import {
   PenalizationRecordStatus,
 } from '../penalization-policies/entities/penalization-record.entity.js';
 import { ShiftAssignment } from '../shifts/entities/shift-assignment.entity.js';
+import type { Shift } from '../shifts/entities/shift.entity.js';
 import { ShiftWeeklyOff } from '../shifts/entities/shift-weekly-off.entity.js';
 import { EmployeeProfile } from '../users/entities/employee-profile.entity.js';
 import { User } from '../users/entities/user.entity.js';
@@ -44,6 +51,11 @@ import {
 @Injectable()
 export class PayrollReportsService {
   private readonly logger = new Logger(PayrollReportsService.name);
+
+  onModuleInit(): void {
+    const tz = process.env.TIMEZONE ?? process.env.TZ ?? 'not set';
+    this.logger.log(`Payroll service initialized. TIMEZONE env = ${tz}`);
+  }
 
   constructor(
     @InjectRepository(PayrollReport)
@@ -80,6 +92,26 @@ export class PayrollReportsService {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private isUnpaidLeave(leave: Leave): boolean {
+    if (leave.leaveTypeConfig) {
+      return !leave.leaveTypeConfig.isPaid;
+    }
+    return leave.leaveType === LeaveType.UNPAID;
+  }
+
+  private getShiftForDate(
+    assignments: ShiftAssignment[],
+    dateStr: string
+  ): { shift: Shift | null; weeklyOffDays: Set<number> } {
+    const assignment = assignments.find(a => a.effectiveFrom <= dateStr);
+    const shift = assignment?.shift ?? null;
+    const weeklyOffs = shift?.weeklyOffs ?? [];
+    return {
+      shift,
+      weeklyOffDays: new Set(weeklyOffs.map(w => w.dayOfWeek)),
+    };
   }
 
   /**
@@ -188,7 +220,10 @@ export class PayrollReportsService {
       where: { userId: user.id },
     });
 
-    const shiftAssignment = await this.shiftAssignmentRepo.findOne({
+    const joiningDate = profile?.joiningDate ?? null;
+
+    // [Fix 3] Load ALL shift assignments for the month so mid-month changes resolve correctly per day
+    const shiftAssignments = await this.shiftAssignmentRepo.find({
       where: {
         userId: user.id,
         isActive: true,
@@ -197,10 +232,6 @@ export class PayrollReportsService {
       relations: ['shift', 'shift.weeklyOffs'],
       order: { effectiveFrom: 'DESC' },
     });
-
-    const shift = shiftAssignment?.shift ?? null;
-    const weeklyOffs = shift?.weeklyOffs ?? [];
-    const weeklyOffDays = new Set(weeklyOffs.map(w => w.dayOfWeek));
 
     const holidayDates = new Set<string>();
     if (profile?.holidayListId) {
@@ -215,12 +246,16 @@ export class PayrollReportsService {
       }
     }
 
+    // [Fix 1] Join leaveTypeConfig so isPaid can be checked
+    // [Fix 7] Filter endDate >= startDate to avoid loading irrelevant old leaves
     const leaves = await this.leaveRepo.find({
       where: {
         userId: user.id,
         status: LeaveStatus.APPROVED,
         startDate: LessThanOrEqual(endDate),
+        endDate: MoreThanOrEqual(startDate),
       },
+      relations: ['leaveTypeConfig'],
     });
     const leaveDateMap = new Map<string, Leave>();
     for (const leave of leaves) {
@@ -284,6 +319,36 @@ export class PayrollReportsService {
       const date = new Date(year, month - 1, day);
       const dateStr = this.toDateString(date);
       const dow = date.getDay();
+
+      // [Fix 2] Skip days before the employee's joining date
+      if (joiningDate && dateStr < joiningDate) {
+        dailyDetails.push({
+          userId: user.id,
+          workDate: dateStr,
+          dayType: DayType.WEEKLY_OFF,
+          punchInAt: null,
+          punchOutAt: null,
+          totalMinutes: null,
+          effectiveMinutes: null,
+          lateByMinutes: null,
+          earlyLeaveMinutes: null,
+          overtimeMinutes: null,
+          status: null,
+          shiftName: null,
+          isAutoLogout: false,
+          penaltyApplied: false,
+          leaveType: null,
+          remarks: 'Not yet joined',
+        });
+        continue;
+      }
+
+      // [Fix 3] Resolve shift for this specific day
+      const { shift: dayShift, weeklyOffDays } = this.getShiftForDate(
+        shiftAssignments,
+        dateStr
+      );
+
       const attendance = attendanceMap.get(dateStr);
       const leave = leaveDateMap.get(dateStr);
       const isWeeklyOff = weeklyOffDays.has(dow);
@@ -301,12 +366,15 @@ export class PayrollReportsService {
         totalHolidayDays++;
       } else if (leave) {
         dayType = DayType.LEAVE;
-        if (leave.leaveType === LeaveType.UNPAID) {
+        // [Fix 1] Use leaveTypeConfig.isPaid when available, fall back to legacy enum
+        if (this.isUnpaidLeave(leave)) {
           totalUnpaidLeaveDays += leave.isHalfDay ? 0.5 : 1;
         } else {
           totalPaidLeaveDays += leave.isHalfDay ? 0.5 : 1;
         }
-        remarks = `Leave: ${leave.leaveType ?? 'other'}`;
+        const leaveName =
+          leave.leaveTypeConfig?.name ?? leave.leaveType ?? 'other';
+        remarks = `Leave: ${leaveName}`;
       } else {
         dayType = DayType.WORKING;
         totalWorkingDays++;
@@ -348,7 +416,7 @@ export class PayrollReportsService {
         overtimeMinutes: attendance?.overtimeMinutes ?? null,
         status:
           attendance?.status ?? (dayType === DayType.WORKING ? 'absent' : null),
-        shiftName: attendance?.shift?.name ?? shift?.name ?? null,
+        shiftName: attendance?.shift?.name ?? dayShift?.name ?? null,
         isAutoLogout: attendance?.isAutoLogout ?? false,
         penaltyApplied: hasPenalty,
         leaveType: leave?.leaveType ?? null,
@@ -382,6 +450,8 @@ export class PayrollReportsService {
       totalPenaltyDays +
       totalHalfDays * 0.5;
 
+    // [Fix 6] netPayableDays is an informational/audit field.
+    // Authoritative salary calculation uses: deductions = dailySalary * lopDays
     const netPayableDays = Math.max(
       0,
       totalWorkingDays -
