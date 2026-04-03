@@ -214,22 +214,39 @@ export class AttendanceService {
     return hours * 60 + minutes;
   }
 
+  /**
+   * Extract hours and minutes from a Date in the configured business timezone,
+   * returned as total minutes since midnight. Uses Intl so results are correct
+   * regardless of the server's system timezone.
+   */
+  private getLocalTimeMinutes(date: Date): number {
+    const tz = process.env.TIMEZONE || 'Asia/Kolkata';
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(date);
+    const h = Number(parts.find(p => p.type === 'hour')?.value ?? 0);
+    const m = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
+    return h * 60 + m;
+  }
+
   private isLate(punchInAt: Date, shift: Shift): boolean {
-    const punchInMinutes = punchInAt.getHours() * 60 + punchInAt.getMinutes();
+    const punchInMinutes = this.getLocalTimeMinutes(punchInAt);
     const shiftStartMinutes = this.parseTimeToMinutes(shift.startTime);
     return punchInMinutes > shiftStartMinutes + shift.graceMinutes;
   }
 
   private computeLateByMinutes(punchInAt: Date, shift: Shift): number {
-    const punchInMinutes = punchInAt.getHours() * 60 + punchInAt.getMinutes();
+    const punchInMinutes = this.getLocalTimeMinutes(punchInAt);
     const shiftStartMinutes = this.parseTimeToMinutes(shift.startTime);
     const diff = punchInMinutes - shiftStartMinutes;
     return diff > 0 ? diff : 0;
   }
 
   private computeEarlyLeaveMinutes(punchOutAt: Date, shift: Shift): number {
-    const punchOutMinutes =
-      punchOutAt.getHours() * 60 + punchOutAt.getMinutes();
+    const punchOutMinutes = this.getLocalTimeMinutes(punchOutAt);
     const shiftEndMinutes = this.parseTimeToMinutes(shift.endTime);
     const diff = shiftEndMinutes - punchOutMinutes;
     return diff > 0 ? diff : 0;
@@ -253,21 +270,21 @@ export class AttendanceService {
   }
 
   /**
-   * Determine attendance status on punch-out based on total worked hours
-   * relative to shift's work hours.
+   * Determine attendance status on punch-out based on effective worked hours
+   * (total minus break) relative to shift's required work hours.
    */
   private determineStatus(
-    totalMinutes: number,
+    effectiveMinutes: number,
     shift: Shift | null,
     wasLate: boolean
   ): AttendanceStatus {
     const requiredMinutes = shift ? Number(shift.workHoursPerDay) * 60 : 9 * 60;
 
-    if (totalMinutes >= requiredMinutes) {
+    if (effectiveMinutes >= requiredMinutes) {
       return wasLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
     }
 
-    if (totalMinutes >= requiredMinutes / 2) {
+    if (effectiveMinutes >= requiredMinutes / 2) {
       return AttendanceStatus.HALF_DAY;
     }
 
@@ -315,7 +332,7 @@ export class AttendanceService {
       );
 
     const shift = shiftAssignment?.shift ?? null;
-    const late = shift ? this.isLate(now, shift) : false;
+    const late = shift && !shift.isFlexible ? this.isLate(now, shift) : false;
 
     const attendance =
       existing ??
@@ -336,7 +353,7 @@ export class AttendanceService {
       attendance.shiftId = shift?.id ?? null;
     }
 
-    if (shift) {
+    if (shift && !shift.isFlexible) {
       attendance.lateByMinutes = this.computeLateByMinutes(now, shift);
     }
 
@@ -399,7 +416,7 @@ export class AttendanceService {
     attendance.effectiveMinutes = effectiveMinutes;
     attendance.overtimeMinutes = overtimeMinutes;
     attendance.earlyLeaveMinutes = earlyLeaveMinutes;
-    attendance.status = this.determineStatus(totalMinutes, shift, wasLate);
+    attendance.status = this.determineStatus(effectiveMinutes, shift, wasLate);
 
     const saved = await this.attendanceRepository.save(attendance);
 

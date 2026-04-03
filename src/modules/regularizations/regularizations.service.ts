@@ -99,15 +99,28 @@ export class RegularizationsService {
     return hours * 60 + minutes;
   }
 
+  private getLocalTimeMinutes(date: Date): number {
+    const tz = process.env.TIMEZONE || 'Asia/Kolkata';
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(date);
+    const h = Number(parts.find(p => p.type === 'hour')?.value ?? 0);
+    const m = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
+    return h * 60 + m;
+  }
+
   private determineStatus(
-    totalMinutes: number,
+    effectiveMinutes: number,
     requiredMinutes: number,
     wasLate: boolean
   ): AttendanceStatus {
-    if (totalMinutes >= requiredMinutes) {
+    if (effectiveMinutes >= requiredMinutes) {
       return wasLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
     }
-    if (totalMinutes >= requiredMinutes / 2) {
+    if (effectiveMinutes >= requiredMinutes / 2) {
       return AttendanceStatus.HALF_DAY;
     }
     return AttendanceStatus.ABSENT;
@@ -495,17 +508,13 @@ export class RegularizationsService {
     let earlyLeaveMinutes = 0;
     let wasLate = false;
 
-    if (shift) {
-      const punchInMinutes =
-        request.requestedPunchIn.getHours() * 60 +
-        request.requestedPunchIn.getMinutes();
+    if (shift && !shift.isFlexible) {
+      const punchInMinutes = this.getLocalTimeMinutes(request.requestedPunchIn);
       const shiftStartMinutes = this.parseTimeToMinutes(shift.startTime);
       lateByMinutes = Math.max(0, punchInMinutes - shiftStartMinutes);
       wasLate = punchInMinutes > shiftStartMinutes + shift.graceMinutes;
 
-      const punchOutMinutes =
-        request.requestedPunchOut.getHours() * 60 +
-        request.requestedPunchOut.getMinutes();
+      const punchOutMinutes = this.getLocalTimeMinutes(request.requestedPunchOut);
       const shiftEndMinutes = this.parseTimeToMinutes(shift.endTime);
       earlyLeaveMinutes = Math.max(0, shiftEndMinutes - punchOutMinutes);
     }
@@ -513,7 +522,7 @@ export class RegularizationsService {
     attendance.lateByMinutes = lateByMinutes;
     attendance.earlyLeaveMinutes = earlyLeaveMinutes;
     attendance.status = this.determineStatus(
-      totalMinutes,
+      effectiveMinutes,
       requiredMinutes,
       wasLate
     );

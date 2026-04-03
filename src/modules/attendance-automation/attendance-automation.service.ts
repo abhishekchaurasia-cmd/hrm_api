@@ -61,15 +61,15 @@ export class AttendanceAutomationService {
   }
 
   private determineStatus(
-    totalMinutes: number,
+    effectiveMinutes: number,
     shift: Shift | null,
     wasLate: boolean
   ): AttendanceStatus {
     const requiredMinutes = shift ? Number(shift.workHoursPerDay) * 60 : 9 * 60;
-    if (totalMinutes >= requiredMinutes) {
+    if (effectiveMinutes >= requiredMinutes) {
       return wasLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
     }
-    if (totalMinutes >= requiredMinutes / 2) {
+    if (effectiveMinutes >= requiredMinutes / 2) {
       return AttendanceStatus.HALF_DAY;
     }
     return AttendanceStatus.ABSENT;
@@ -136,7 +136,7 @@ export class AttendanceAutomationService {
       record.earlyLeaveMinutes = 0;
       record.isAutoLogout = true;
       record.autoLogoutReason = 'midnight_cutoff';
-      record.status = this.determineStatus(totalMinutes, shift, wasLate);
+      record.status = this.determineStatus(effectiveMinutes, shift, wasLate);
 
       await this.attendanceRepo.save(record);
       processed++;

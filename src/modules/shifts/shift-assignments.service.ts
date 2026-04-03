@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { IsNull, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import type { ApiResponse } from '../../common/interfaces/api-response.interface.js';
@@ -120,11 +120,20 @@ export class ShiftAssignmentsService {
     date: string
   ): Promise<ShiftAssignment | null> {
     return this.assignmentRepository.findOne({
-      where: {
-        userId,
-        isActive: true,
-        effectiveFrom: LessThanOrEqual(date),
-      },
+      where: [
+        {
+          userId,
+          isActive: true,
+          effectiveFrom: LessThanOrEqual(date),
+          effectiveTo: IsNull(),
+        },
+        {
+          userId,
+          isActive: true,
+          effectiveFrom: LessThanOrEqual(date),
+          effectiveTo: MoreThanOrEqual(date),
+        },
+      ],
       relations: ['shift', 'shift.weeklyOffs'],
       order: { effectiveFrom: 'DESC' },
     });
