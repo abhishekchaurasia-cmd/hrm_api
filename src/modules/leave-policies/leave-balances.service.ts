@@ -191,22 +191,43 @@ export class LeaveBalancesService {
     const { page, limit } = pagination;
     const balanceYear = year ?? new Date().getFullYear();
 
-    const userQb = this.balanceRepository
+    const searchLike = search ? `%${search.toLowerCase()}%` : undefined;
+
+    const countQb = this.balanceRepository
       .createQueryBuilder('balance')
-      .select('DISTINCT balance.userId', 'userId')
-      .addSelect('user.firstName', 'firstName')
-      .addSelect('user.lastName', 'lastName')
+      .select('COUNT(DISTINCT(balance.userId))', 'count')
       .innerJoin('balance.user', 'user')
       .where('balance.year = :balanceYear', { balanceYear });
 
-    if (search) {
-      userQb.andWhere(
+    if (searchLike) {
+      countQb.andWhere(
         "(LOWER(user.firstName) LIKE :search OR LOWER(user.lastName) LIKE :search OR LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :search)",
-        { search: `%${search.toLowerCase()}%` }
+        { search: searchLike }
       );
     }
 
-    const totalUsers = await userQb.getCount();
+    const countResult: { count?: string } | undefined =
+      await countQb.getRawOne();
+    const totalUsers = parseInt(countResult?.count ?? '0', 10);
+
+    const userQb = this.balanceRepository
+      .createQueryBuilder('balance')
+      .select('balance.userId', 'userId')
+      .addSelect('user.firstName', 'firstName')
+      .addSelect('user.lastName', 'lastName')
+      .innerJoin('balance.user', 'user')
+      .where('balance.year = :balanceYear', { balanceYear })
+      .groupBy('balance.userId')
+      .addGroupBy('user.firstName')
+      .addGroupBy('user.lastName');
+
+    if (searchLike) {
+      userQb.andWhere(
+        "(LOWER(user.firstName) LIKE :search OR LOWER(user.lastName) LIKE :search OR LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :search)",
+        { search: searchLike }
+      );
+    }
+
     const userRows: Array<{ userId: string }> = await userQb
       .orderBy('user.firstName', 'ASC')
       .addOrderBy('user.lastName', 'ASC')
