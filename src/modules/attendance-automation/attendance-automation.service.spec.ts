@@ -261,6 +261,17 @@ describe('AttendanceAutomationService', () => {
     });
 
     it('should not mark absent if on approved leave', async () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const yd = `${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}`;
+      const leaveStart = new Date(yesterday);
+      leaveStart.setDate(leaveStart.getDate() - 2);
+      const ls = `${leaveStart.getFullYear()}-${pad(leaveStart.getMonth() + 1)}-${pad(leaveStart.getDate())}`;
+      const leaveEnd = new Date(yesterday);
+      leaveEnd.setDate(leaveEnd.getDate() + 3);
+      const le = `${leaveEnd.getFullYear()}-${pad(leaveEnd.getMonth() + 1)}-${pad(leaveEnd.getDate())}`;
+
       mockUserRepo.find.mockResolvedValue([{ id: 'user-1' }]);
       mockAttendanceRepo.findOne.mockResolvedValue(null);
       mockShiftAssignmentRepo.findOne.mockResolvedValue(null);
@@ -268,8 +279,8 @@ describe('AttendanceAutomationService', () => {
       mockProfileRepo.findOne.mockResolvedValue(null);
       mockLeaveRepo.findOne.mockResolvedValue({
         status: LeaveStatus.APPROVED,
-        startDate: '2026-03-15',
-        endDate: '2026-03-20',
+        startDate: ls,
+        endDate: le,
       });
 
       const result = await service.handleMarkAbsent();
