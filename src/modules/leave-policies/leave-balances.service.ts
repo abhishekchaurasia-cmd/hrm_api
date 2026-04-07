@@ -169,6 +169,123 @@ export class LeaveBalancesService {
     };
   }
 
+  async findOverview(
+    pagination: PaginationQueryDto,
+    year?: number,
+    search?: string
+  ): Promise<
+    ApiResponse<{
+      leaveTypes: Array<{ id: string; name: string; code: string }>;
+      employees: PaginatedResult<{
+        userId: string;
+        user: {
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+        };
+        balances: LeaveBalance[];
+      }>;
+    }>
+  > {
+    const { page, limit } = pagination;
+    const balanceYear = year ?? new Date().getFullYear();
+
+    const userQb = this.balanceRepository
+      .createQueryBuilder('balance')
+      .select('DISTINCT balance.userId', 'userId')
+      .addSelect('user.firstName', 'firstName')
+      .addSelect('user.lastName', 'lastName')
+      .innerJoin('balance.user', 'user')
+      .where('balance.year = :balanceYear', { balanceYear });
+
+    if (search) {
+      userQb.andWhere(
+        "(LOWER(user.firstName) LIKE :search OR LOWER(user.lastName) LIKE :search OR LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :search)",
+        { search: `%${search.toLowerCase()}%` }
+      );
+    }
+
+    const totalUsers = await userQb.getCount();
+    const userRows: Array<{ userId: string }> = await userQb
+      .orderBy('user.firstName', 'ASC')
+      .addOrderBy('user.lastName', 'ASC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany();
+
+    const userIds = userRows.map(r => r.userId);
+
+    let balances: LeaveBalance[] = [];
+    if (userIds.length > 0) {
+      balances = await this.balanceRepository
+        .createQueryBuilder('balance')
+        .leftJoinAndSelect('balance.leaveTypeConfig', 'config')
+        .leftJoinAndSelect('balance.user', 'user')
+        .where('balance.userId IN (:...userIds)', { userIds })
+        .andWhere('balance.year = :balanceYear', { balanceYear })
+        .orderBy('user.firstName', 'ASC')
+        .addOrderBy('config.name', 'ASC')
+        .getMany();
+    }
+
+    const leaveTypeMap = new Map<
+      string,
+      { id: string; name: string; code: string }
+    >();
+    const employeeMap = new Map<
+      string,
+      {
+        userId: string;
+        user: {
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+        };
+        balances: LeaveBalance[];
+      }
+    >();
+
+    for (const b of balances) {
+      if (b.leaveTypeConfig && !leaveTypeMap.has(b.leaveTypeConfig.id)) {
+        leaveTypeMap.set(b.leaveTypeConfig.id, {
+          id: b.leaveTypeConfig.id,
+          name: b.leaveTypeConfig.name,
+          code: b.leaveTypeConfig.code,
+        });
+      }
+      if (!employeeMap.has(b.userId)) {
+        employeeMap.set(b.userId, {
+          userId: b.userId,
+          user: b.user
+            ? {
+                id: b.user.id,
+                firstName: b.user.firstName,
+                lastName: b.user.lastName,
+                email: b.user.email,
+              }
+            : { id: b.userId, firstName: '', lastName: '', email: '' },
+          balances: [],
+        });
+      }
+      employeeMap.get(b.userId)!.balances.push(b);
+    }
+
+    const employees = userIds
+      .map(id => employeeMap.get(id))
+      .filter((e): e is NonNullable<typeof e> => e !== undefined);
+
+    return {
+      success: true,
+      message: 'Leave balance overview retrieved',
+      data: {
+        leaveTypes: Array.from(leaveTypeMap.values()),
+        employees: paginate(employees, totalUsers, page, limit),
+      },
+    };
+  }
+
   async findByEmployee(
     userId: string,
     year?: number

@@ -24,6 +24,7 @@ import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto.js';
+import { LeaveBalanceOverviewQueryDto } from './dto/leave-balance-overview-query.dto.js';
 import {
   LeaveBalanceQueryDto,
   LeaveTransactionQueryDto,
@@ -68,6 +69,20 @@ export class LeaveBalancesController {
   findAll(@Query() query: LeaveBalanceQueryDto) {
     const { page, limit, userId, planId, year } = query;
     return this.balancesService.findAll({ page, limit }, userId, planId, year);
+  }
+
+  @Get('overview')
+  @Roles(UserRole.HR)
+  @ApiOperation({
+    summary: 'Get leave balances grouped by employee (HR only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Leave balance overview retrieved',
+  })
+  findOverview(@Query() query: LeaveBalanceOverviewQueryDto) {
+    const { page, limit, year, search } = query;
+    return this.balancesService.findOverview({ page, limit }, year, search);
   }
 
   @Get('employee/:userId')
