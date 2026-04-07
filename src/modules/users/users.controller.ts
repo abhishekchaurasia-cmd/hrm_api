@@ -49,6 +49,18 @@ export class UsersController {
     return this.usersService.getUpcomingBirthdays(7);
   }
 
+  @Get('upcoming-anniversaries')
+  @ApiOperation({
+    summary: 'Get employees with work anniversaries in the next 30 days',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Upcoming work anniversaries retrieved',
+  })
+  getUpcomingAnniversaries() {
+    return this.usersService.getUpcomingAnniversaries(30);
+  }
+
   @Get('options')
   @Roles(UserRole.HR)
   @ApiOperation({

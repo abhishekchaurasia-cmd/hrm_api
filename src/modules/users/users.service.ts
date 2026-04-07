@@ -186,6 +186,78 @@ export class UsersService {
     };
   }
 
+  async getUpcomingAnniversaries(days = 30): Promise<
+    ApiResponse<
+      Array<{
+        userId: string;
+        firstName: string;
+        lastName: string;
+        joiningDate: string;
+        yearsOfService: number;
+        department: string | null;
+      }>
+    >
+  > {
+    const today = new Date();
+    const pairs: Array<{ month: number; day: number }> = [];
+    for (let i = 0; i <= days; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      pairs.push({ month: d.getMonth() + 1, day: d.getDate() });
+    }
+
+    const conditions = pairs
+      .map(
+        (_, i) =>
+          `(EXTRACT(MONTH FROM ep."joiningDate") = :am${i} AND EXTRACT(DAY FROM ep."joiningDate") = :ad${i})`
+      )
+      .join(' OR ');
+
+    const params: Record<string, number> = {};
+    pairs.forEach((p, i) => {
+      params[`am${i}`] = p.month;
+      params[`ad${i}`] = p.day;
+    });
+
+    const raw: Array<{
+      userId: string;
+      firstName: string;
+      lastName: string;
+      joiningDate: string;
+      department: string | null;
+    }> = await this.profileRepository
+      .createQueryBuilder('ep')
+      .innerJoin('ep.user', 'u')
+      .leftJoin('u.department', 'dept')
+      .select([
+        'u.id AS "userId"',
+        'u."firstName" AS "firstName"',
+        'u."lastName" AS "lastName"',
+        'ep."joiningDate" AS "joiningDate"',
+        'dept.name AS "department"',
+      ])
+      .where('ep."joiningDate" IS NOT NULL')
+      .andWhere('u."isActive" = true')
+      .andWhere(`(${conditions})`)
+      .setParameters(params)
+      .getRawMany();
+
+    const currentYear = today.getFullYear();
+    const results = raw
+      .map(r => ({
+        ...r,
+        yearsOfService:
+          currentYear - new Date(r.joiningDate + 'T00:00:00').getFullYear(),
+      }))
+      .filter(r => r.yearsOfService > 0);
+
+    return {
+      success: true,
+      message: 'Upcoming work anniversaries retrieved',
+      data: results,
+    };
+  }
+
   async getUpcomingBirthdays(days = 7): Promise<
     ApiResponse<
       Array<{
