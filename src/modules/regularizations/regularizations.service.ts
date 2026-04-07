@@ -514,7 +514,9 @@ export class RegularizationsService {
       lateByMinutes = Math.max(0, punchInMinutes - shiftStartMinutes);
       wasLate = punchInMinutes > shiftStartMinutes + shift.graceMinutes;
 
-      const punchOutMinutes = this.getLocalTimeMinutes(request.requestedPunchOut);
+      const punchOutMinutes = this.getLocalTimeMinutes(
+        request.requestedPunchOut
+      );
       const shiftEndMinutes = this.parseTimeToMinutes(shift.endTime);
       earlyLeaveMinutes = Math.max(0, shiftEndMinutes - punchOutMinutes);
     }
