@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
+import { FindUnassignedEmployeesQueryDto } from './dto/find-unassigned-employees-query.dto.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -203,21 +204,14 @@ export class HolidayListsController {
     summary: 'Get employees not assigned to this holiday list (HR only)',
   })
   @ApiResponse({ status: 200, description: 'Unassigned employees retrieved' })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Search by name, email, or employee number',
-  })
   getUnassignedEmployees(
     @Param('listId', ParseUUIDPipe) listId: string,
-    @Query() pagination: PaginationQueryDto,
-    @Query('search') search?: string
+    @Query() query: FindUnassignedEmployeesQueryDto
   ) {
     return this.service.getUnassignedEmployees(
       listId,
-      pagination,
-      search || undefined
+      query,
+      query.search || undefined
     );
   }
 

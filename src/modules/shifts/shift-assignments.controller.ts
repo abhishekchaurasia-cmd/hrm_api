@@ -13,7 +13,6 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -25,8 +24,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateShiftAssignmentDto } from './dto/create-shift-assignment.dto.js';
+import { FindShiftAssignmentsQueryDto } from './dto/find-shift-assignments-query.dto.js';
 import { UpdateShiftAssignmentDto } from './dto/update-shift-assignment.dto.js';
 import { ShiftAssignmentsService } from './shift-assignments.service.js';
 
@@ -47,15 +46,9 @@ export class ShiftAssignmentsController {
 
   @Get()
   @ApiOperation({ summary: 'List shift assignments (HR only)' })
-  @ApiQuery({ name: 'userId', required: false })
-  @ApiQuery({ name: 'shiftId', required: false })
   @ApiResponse({ status: 200, description: 'Assignments retrieved' })
-  findAll(
-    @Query() pagination: PaginationQueryDto,
-    @Query('userId') userId?: string,
-    @Query('shiftId') shiftId?: string
-  ) {
-    return this.assignmentsService.findAll(pagination, userId, shiftId);
+  findAll(@Query() query: FindShiftAssignmentsQueryDto) {
+    return this.assignmentsService.findAll(query, query.userId, query.shiftId);
   }
 
   @Get('employee/:userId')

@@ -12,7 +12,6 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -24,8 +23,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface.js';
 import { UserRole } from '../users/entities/user.entity.js';
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateLeavePlanAssignmentDto } from './dto/create-leave-plan-assignment.dto.js';
+import { FindLeavePlanAssignmentsQueryDto } from './dto/find-leave-plan-assignments-query.dto.js';
 import { LeavePlanAssignmentsService } from './leave-plan-assignments.service.js';
 
 @ApiTags('leave-plan-assignments')
@@ -50,15 +49,9 @@ export class LeavePlanAssignmentsController {
 
   @Get()
   @ApiOperation({ summary: 'List leave plan assignments (HR only)' })
-  @ApiQuery({ name: 'userId', required: false })
-  @ApiQuery({ name: 'planId', required: false })
   @ApiResponse({ status: 200, description: 'Assignments retrieved' })
-  findAll(
-    @Query() pagination: PaginationQueryDto,
-    @Query('userId') userId?: string,
-    @Query('planId') planId?: string
-  ) {
-    return this.assignmentsService.findAll(pagination, userId, planId);
+  findAll(@Query() query: FindLeavePlanAssignmentsQueryDto) {
+    return this.assignmentsService.findAll(query, query.userId, query.planId);
   }
 
   @Delete(':id')

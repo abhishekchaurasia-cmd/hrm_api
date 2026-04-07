@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, LessThanOrEqual, Repository } from 'typeorm';
@@ -134,6 +135,8 @@ export interface MonthlyEmployeeSummary {
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     @InjectRepository(Attendance)
     private readonly attendanceRepository: Repository<Attendance>,
@@ -235,7 +238,7 @@ export class AttendanceService {
   private isLate(punchInAt: Date, shift: Shift): boolean {
     const punchInMinutes = this.getLocalTimeMinutes(punchInAt);
     const shiftStartMinutes = this.parseTimeToMinutes(shift.startTime);
-    return punchInMinutes > shiftStartMinutes + shift.graceMinutes;
+    return punchInMinutes > shiftStartMinutes + Number(shift.graceMinutes);
   }
 
   private computeLateByMinutes(punchInAt: Date, shift: Shift): number {
@@ -330,6 +333,12 @@ export class AttendanceService {
         user.id,
         workDate
       );
+
+    if (!shiftAssignment) {
+      this.logger.warn(
+        `No active shift assignment found for user ${user.id} on ${workDate}; late check skipped`
+      );
+    }
 
     const shift = shiftAssignment?.shift ?? null;
     const late = shift && !shift.isFlexible ? this.isLate(now, shift) : false;
